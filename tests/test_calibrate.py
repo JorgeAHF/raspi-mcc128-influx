@@ -5,10 +5,9 @@ from pathlib import Path
 import pytest
 import yaml
 
-# Allow importing scripts from the edge/scr directory.
-sys.path.append(str(Path(__file__).resolve().parents[1] / "edge" / "scr"))
+sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from calibrate import apply_calibration  # type: ignore  # noqa: E402
+from edge.src.calibrate import apply_calibration
 
 
 @pytest.mark.parametrize(

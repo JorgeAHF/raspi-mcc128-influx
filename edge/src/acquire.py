@@ -1,10 +1,21 @@
-import os, time
-import yaml
+import sys
+from pathlib import Path
 from time import time_ns
+
+import yaml
 from daqhats import AnalogInputRange
-from mcc_reader import open_mcc128, start_scan, read_block, DEFAULT_TIMEOUT_MARGIN_S
-from calibrate import apply_calibration
-from sender import InfluxSender, to_line
+
+if __package__ is None or __package__ == "":
+    sys.path.append(str(Path(__file__).resolve().parents[2]))
+
+from edge.src.calibrate import apply_calibration
+from edge.src.mcc_reader import (
+    DEFAULT_TIMEOUT_MARGIN_S,
+    open_mcc128,
+    read_block,
+    start_scan,
+)
+from edge.src.sender import InfluxSender, to_line
 
 def main():
     cfg = yaml.safe_load(open("config/sensors.yaml","r"))

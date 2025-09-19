@@ -70,13 +70,13 @@ channels:
 | Parámetro                 | Ubicación                           | Valor por defecto | Descripción |
 |---------------------------|-------------------------------------|-------------------|-------------|
 | `sample_rate_hz`          | `edge/config/sensors.yaml`          | `10` Hz           | Frecuencia de muestreo por canal (`fs`). Ajuste según la dinámica del sensor y el ancho de banda requerido.【F:edge/config/sensors.yaml†L1-L12】 |
-| `scan_block_size`         | `edge/config/sensors.yaml`          | `50` muestras     | Tamaño del bloque leído en cada iteración. Define la latencia (~5 s a 10 Hz) y se usa para calcular el timeout dinámico.【F:edge/config/sensors.yaml†L3-L8】【F:edge/scr/mcc_reader.py†L8-L33】 |
-| `DEFAULT_TIMEOUT_MARGIN_S`| `edge/scr/mcc_reader.py`            | `0.5` s           | Margen extra sumado al tiempo esperado del bloque (`block_size/fs + margen`) para evitar timeouts espurios.【F:edge/scr/mcc_reader.py†L19-L35】 |
+| `scan_block_size`         | `edge/config/sensors.yaml`          | `50` muestras     | Tamaño del bloque leído en cada iteración. Define la latencia (~5 s a 10 Hz) y se usa para calcular el timeout dinámico.【F:edge/config/sensors.yaml†L3-L8】【F:edge/src/mcc_reader.py†L8-L35】 |
+| `DEFAULT_TIMEOUT_MARGIN_S`| `edge/src/mcc_reader.py`            | `0.5` s           | Margen extra sumado al tiempo esperado del bloque (`block_size/fs + margen`) para evitar timeouts espurios.【F:edge/src/mcc_reader.py†L21-L35】 |
 
 ## Guía de calibración (`gain` / `offset`)
 - Cada canal aplica la relación lineal `magnitud = gain * Voltaje + offset` definida en `calib`.
 - Para obtener `gain` y `offset`, registre dos o más puntos conocidos (por ejemplo, 0 % y 100 % de recorrido) y calcule la recta (pendiente = `gain`, intersección = `offset`).
-- Actualice los valores en `sensors.yaml` y guarde. El módulo `calibrate.apply_calibration` aplicará automáticamente la corrección durante la adquisición.【F:edge/config/sensors.yaml†L6-L12】【F:edge/scr/calibrate.py†L1-L4】
+- Actualice los valores en `sensors.yaml` y guarde. El módulo `calibrate.apply_calibration` aplicará automáticamente la corrección durante la adquisición.【F:edge/config/sensors.yaml†L6-L12】【F:edge/src/calibrate.py†L1-L3】
 
 ## Prueba rápida de lectura
 Realice esta validación antes de instalar el servicio.
@@ -85,7 +85,7 @@ cd ~/projects/raspi-mcc128-influx/edge
 source ~/venv-daq/bin/activate
 python - <<'PY'
 import sys, pathlib
-sys.path.append(str(pathlib.Path('scr').resolve()))
+sys.path.append(str(pathlib.Path('src').resolve()))
 from mcc_reader import open_mcc128, start_scan, read_block
 from daqhats import AnalogInputRange
 cfg = {
@@ -106,7 +106,7 @@ Si desea enviar datos reales a Influx, ejecute el colector continuo (deténgalo 
 ```bash
 cd ~/projects/raspi-mcc128-influx/edge
 source ~/venv-daq/bin/activate
-python scr/acquire.py
+python src/acquire.py
 ```
 
 ## Instalación del servicio `edge.service`
@@ -146,9 +146,9 @@ bash deploy.sh
 Pasos internos: `git fetch/reset` a `origin/main`, activa `~/venv-daq`, instala `requirements.txt` y reinicia `edge.service`. Edite el script si su ruta o rama difiere.【F:deploy.sh†L1-L19】
 
 ## Solución de problemas comunes
-- **InfluxDB responde 400 (Bad Request)**: revise que el bucket exista y que las etiquetas/campos no contengan caracteres no válidos. Verifique que el host no fuerce HTTPS cuando usa HTTP.【F:edge/scr/sender.py†L46-L74】
+- **InfluxDB responde 400 (Bad Request)**: revise que el bucket exista y que las etiquetas/campos no contengan caracteres no válidos. Verifique que el host no fuerce HTTPS cuando usa HTTP.【F:edge/src/sender.py†L46-L86】
 - **InfluxDB responde 401 (Unauthorized)**: confirme `INFLUX_TOKEN`, `INFLUX_ORG` y permisos del token (`read/write` sobre el bucket). Repita la prueba `curl` de credenciales.
 - **Cortafuegos / puertos bloqueados**: asegure que el puerto de Influx (por defecto 8086) esté abierto desde la red de la Pi (`sudo ufw allow out 8086/tcp` o regla equivalente en el servidor).
 - **Desajuste horario / NTP**: la marca de tiempo se envía en nanosegundos. Configure NTP para evitar rechazos por timestamps futuros (`sudo timedatectl set-ntp true`).
-- **Falta de variables de entorno al ejecutar como servicio**: revise que `EnvironmentFile` apunte al `.env` correcto y reinicie el servicio tras cambios.【F:edge/scr/sender.py†L16-L44】【F:edge/service/edge.service†L7-L11】
+- **Falta de variables de entorno al ejecutar como servicio**: revise que `EnvironmentFile` apunte al `.env` correcto y reinicie el servicio tras cambios.【F:edge/src/sender.py†L13-L55】【F:edge/service/edge.service†L7-L11】
 - **Overflow del buffer del MCC 128**: aumente `scan_block_size`, reduzca `sample_rate_hz` o mejore la conectividad a Influx para evitar colas llenas. Revise los mensajes de advertencia en `journalctl`.
