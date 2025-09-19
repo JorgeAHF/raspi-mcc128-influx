@@ -2,7 +2,7 @@ import os, time
 import yaml
 from time import time_ns
 from daqhats import AnalogInputRange
-from mcc_reader import open_mcc128, start_scan, read_block
+from mcc_reader import open_mcc128, start_scan, read_block, DEFAULT_TIMEOUT_MARGIN_S
 from calibrate import apply_calibration
 from sender import InfluxSender, to_line
 
