@@ -58,7 +58,7 @@ class InfluxSender:
         self.t.start()
 
     def _worker(self):
-        while not self.stop:
+        while not self.stop or not self.q.empty():
             lines = []
             try:
                 # junta hasta 5 bloques para eficiencia
@@ -66,13 +66,16 @@ class InfluxSender:
                     lines.append(self.q.get(timeout=1))
             except queue.Empty:
                 pass
-            if not lines: continue
+            if not lines:
+                continue
             data = "\n".join(lines)
             headers = {"Authorization": f"Token {self.token}"}
             try:
                 r = requests.post(
                     f"{self.url}/api/v2/write?org={self.org}&bucket={self.bucket}&precision=ns",
-                    headers=headers, data=data, timeout=5
+                    headers=headers,
+                    data=data,
+                    timeout=5,
                 )
                 if r.status_code >= 300:
                     logger.warning(
@@ -91,6 +94,9 @@ class InfluxSender:
                 )
                 self._queue_lines(lines, context=f"exception {type(exc).__name__}")
                 time.sleep(2)
+            finally:
+                for _ in lines:
+                    self.q.task_done()
 
     def enqueue(self, line: str):
         self._queue_lines([line], context="enqueue")
@@ -99,6 +105,7 @@ class InfluxSender:
         if self.stop:
             return
         self.stop = True
+        self.q.join()
         self.t.join()
 
     def _queue_lines(self, lines, context: str):
@@ -129,6 +136,7 @@ class InfluxSender:
     def _drop_oldest(self, context: str) -> bool:
         try:
             self.q.get_nowait()
+            self.q.task_done()
         except queue.Empty:
             logger.warning(
                 "InfluxSender detected queue overflow during %s but found queue empty; dropping pending data.",
