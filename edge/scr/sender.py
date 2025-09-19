@@ -52,6 +52,12 @@ class InfluxSender:
     def enqueue(self, line: str):
         self._queue_lines([line], context="enqueue")
 
+    def close(self):
+        if self.stop:
+            return
+        self.stop = True
+        self.t.join()
+
     def _queue_lines(self, lines, context: str):
         idx = 0
         try:
