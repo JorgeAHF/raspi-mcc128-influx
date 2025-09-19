@@ -22,13 +22,7 @@ def main():
         ts_step = int(1e9 / fs)
 
         while True:
-            raw = read_block(
-                board,
-                ch_mask,
-                block,
-                chans,
-                sample_rate_hz=fs,
-            )
+            raw = read_block(board, ch_mask, block, chans, sample_rate_hz=fs)
             now_ns = time_ns()
             block_len = len(raw[chans[0]]) if chans else 0
             if block_len == 0:
