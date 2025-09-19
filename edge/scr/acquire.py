@@ -1,4 +1,6 @@
-import os, time
+import logging
+import os
+
 import yaml
 from time import time_ns
 from daqhats import AnalogInputRange
@@ -6,9 +8,17 @@ from mcc_reader import open_mcc128, start_scan, read_block, DEFAULT_TIMEOUT_MARG
 from calibrate import apply_calibration
 from sender import InfluxSender, to_line
 
+
+logger = logging.getLogger(__name__)
+
 def main():
     cfg = yaml.safe_load(open("config/sensors.yaml","r"))
-    pi = cfg["station_id"]
+    station_id = os.getenv("STATION_ID") or cfg.get("station_id")
+    if not station_id:
+        logger.error(
+            "No se encontró STATION_ID. Defina la variable de entorno o el campo station_id en config/sensors.yaml."
+        )
+        raise SystemExit(1)
     fs = cfg["sample_rate_hz"]
     chans = [c["ch"] for c in cfg["channels"]]
     board = None
@@ -36,7 +46,7 @@ def main():
                 for i, mm in enumerate(vals):
                     line = to_line(
                         "lvdt",
-                        tags={"pi":pi, "canal":ch, "sensor":sensor, "unidad":unit},
+                        tags={"pi":station_id, "canal":ch, "sensor":sensor, "unidad":unit},
                         fields={"valor":float(mm)},
                         ts_ns=ts0 + i*ts_step
                     )

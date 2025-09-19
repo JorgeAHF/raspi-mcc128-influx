@@ -30,15 +30,16 @@ pip install -r requirements.txt
 ```
 
 ## Configuración de `.env` y `sensors.yaml`
-### Credenciales de InfluxDB (`edge/.env`)
+### Variables de entorno (`edge/.env`)
 1. Copie el ejemplo y edítelo con sus valores reales:
    ```bash
    cd ~/projects/raspi-mcc128-influx/edge
    cp .env.example .env
    chmod 600 .env
-   nano .env  # ajuste INFLUX_URL, INFLUX_ORG, INFLUX_BUCKET e INFLUX_TOKEN
+   nano .env  # ajuste INFLUX_URL, INFLUX_ORG, INFLUX_BUCKET, INFLUX_TOKEN y STATION_ID
    ```
-2. Verifique las credenciales antes de iniciar el servicio:
+2. `STATION_ID` identifica la estación/raspberry en las etiquetas enviadas a InfluxDB. Si el mismo repositorio se despliega en varias Pi, asigne un valor distinto a cada una. También puede definir la variable en el entorno del servicio systemd.
+3. Verifique las credenciales antes de iniciar el servicio:
    ```bash
    source ~/venv-daq/bin/activate
    export $(grep -v '^#' .env | xargs)
@@ -49,9 +50,9 @@ pip install -r requirements.txt
    Debe responder `200 OK`. Un `401` indica token/organización incorrectos.
 
 ### Sensores y adquisición (`edge/config/sensors.yaml`)
-Ajuste los canales, nombres, unidades y calibraciones según su montaje. Ejemplo incluido:
+Ajuste los canales, nombres, unidades y calibraciones según su montaje. El identificador de estación se toma por defecto de `STATION_ID`, pero puede dejar un `station_id` opcional como respaldo para pruebas locales. Ejemplo incluido:
 ```yaml
-station_id: rpi5-a
+# station_id: rpi5-a        # se usa sólo si falta la variable de entorno STATION_ID
 sample_rate_hz: 10
 scan_block_size: 50         # bloque de 5 s -> timeout dinámico = 5 s + 0.5 s de margen
 channels:

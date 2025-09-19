@@ -1,4 +1,4 @@
-station_id: rpi5-a
+# station_id: rpi5-a        # opcional; se usa sólo si falta la variable de entorno STATION_ID
 sample_rate_hz: 10
 scan_block_size: 50         # bloque de 5 s -> timeout dinámico = 5 s + 0.5 s de margen
 channels:
