@@ -1,7 +1,29 @@
 import time, queue, threading, requests, os, logging
 from datetime import datetime, timezone
+from pathlib import Path
+
 
 logger = logging.getLogger(__name__)
+
+
+def _running_under_systemd() -> bool:
+    return any(os.getenv(var) for var in ("INVOCATION_ID", "SYSTEMD_EXEC_PID", "JOURNAL_STREAM"))
+
+
+def _load_dotenv_if_needed():
+    if _running_under_systemd():
+        return
+    try:
+        from dotenv import load_dotenv  # type: ignore
+    except ImportError:
+        logger.warning("python-dotenv no está disponible; continúo sin cargar .env")
+        return
+
+    env_path = Path(__file__).resolve().parents[1] / ".env"
+    load_dotenv(env_path, override=False)
+
+
+_load_dotenv_if_needed()
 
 class InfluxSender:
     def __init__(self):
@@ -9,6 +31,27 @@ class InfluxSender:
         self.org = os.getenv("INFLUX_ORG")
         self.bucket = os.getenv("INFLUX_BUCKET")
         self.token = os.getenv("INFLUX_TOKEN")
+        missing = [
+            name
+            for name, value in (
+                ("INFLUX_URL", self.url),
+                ("INFLUX_ORG", self.org),
+                ("INFLUX_BUCKET", self.bucket),
+                ("INFLUX_TOKEN", self.token),
+            )
+            if not value
+        ]
+        if missing:
+            if _running_under_systemd():
+                hint = (
+                    "Defina las variables faltantes en el archivo de servicio systemd, por ejemplo con "
+                    "Environment=INFLUX_URL=..."
+                )
+            else:
+                hint = "Defina las variables faltantes en edge/.env o expórtelas en su shell antes de ejecutar."
+            raise RuntimeError(
+                "Faltan configuraciones obligatorias: %s. %s" % (", ".join(missing), hint)
+            )
         self.q = queue.Queue(maxsize=1000)
         self.stop = False
         self.t = threading.Thread(target=self._worker, daemon=True)
