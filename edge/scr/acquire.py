@@ -14,11 +14,10 @@ def main():
     board = open_mcc128()
     ch_mask, block = start_scan(board, chans, fs, AnalogInputRange.BIP_10V, cfg.get("scan_block_size", 1000))
     sender = InfluxSender()
-    num_ch = len(chans)
     map_cal = {c["ch"]:(c["sensor"], c["unit"], c["calib"]["gain"], c["calib"]["offset"]) for c in cfg["channels"]}
 
     while True:
-        raw = read_block(board, ch_mask, block, num_ch)
+        raw = read_block(board, ch_mask, block, chans)
         now_ns = time_ns()
         # para cada canal, aplica calibración y envía cada muestra
         for ch in chans:

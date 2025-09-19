@@ -18,14 +18,14 @@ def start_scan(board, channels, fs_hz, v_range=AnalogInputRange.BIP_10V, block_s
     )
     return ch_mask, block_samples
 
-def read_block(board, ch_mask, block_samples, num_ch):
+def read_block(board, ch_mask, block_samples, channels):
     data = board.a_in_scan_read(block_samples, 5.0)  # timeout 5s
     if data.hardware_overrun or data.buffer_overrun:
         raise RuntimeError("Overrun de hardware/buffer")
     # data.data -> lista intercalada por canal
     # reacomoda a dict canal->lista
-    out = {ch: [] for ch in range(8)}
+    out = {ch: [] for ch in channels}
     for i, val in enumerate(data.data):
-        ch = i % num_ch
-        out[ch].append(val)
+        channel = channels[i % len(channels)]
+        out[channel].append(val)
     return out
