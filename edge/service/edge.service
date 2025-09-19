@@ -4,10 +4,10 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-User=pi
-WorkingDirectory=/home/pi/raspi-mcc128-influx/edge
-EnvironmentFile=/home/pi/raspi-mcc128-influx/edge/.env
-ExecStart=/usr/bin/python3 /home/pi/raspi-mcc128-influx/edge/scr/acquire.py
+User=JJSI
+WorkingDirectory=/home/JJSI/projects/raspi-mcc128-influx/edge
+EnvironmentFile=/home/JJSI/projects/raspi-mcc128-influx/edge/.env
+ExecStart=/home/JJSI/venv-daq/bin/python /home/JJSI/projects/raspi-mcc128-influx/edge/src/acquire.py
 Restart=on-failure
 
 [Install]
