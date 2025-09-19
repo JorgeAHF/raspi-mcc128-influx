@@ -36,7 +36,7 @@ pip install -r requirements.txt
    cd ~/projects/raspi-mcc128-influx/edge
    cp .env.example .env
    chmod 600 .env
-   nano .env  # ajuste INFLUX_URL, INFLUX_ORG, INFLUX_BUCKET e INFLUX_TOKEN
+   nano .env  # ajuste INFLUX_URL, INFLUX_ORG, INFLUX_BUCKET, INFLUX_TOKEN y STATION_ID
    ```
 2. Verifique las credenciales antes de iniciar el servicio:
    ```bash
@@ -47,6 +47,17 @@ pip install -r requirements.txt
         --header "Accept: application/json"
    ```
    Debe responder `200 OK`. Un `401` indica token/organización incorrectos.
+
+> **Importante:** Nunca suba el archivo `.env` al repositorio. El archivo ya está listado en `.gitignore`, pero confirme con `git status` antes de hacer commits para evitar incluir credenciales por error.
+
+### Rotación del token de InfluxDB
+1. Inicie sesión en la UI de InfluxDB y genere un token nuevo con permisos de lectura/escritura sobre el bucket correspondiente.
+2. Actualice el valor de `INFLUX_TOKEN` (y otros campos que hayan cambiado) en `edge/.env` y guarde el archivo.
+3. Reinicie el servicio o proceso que use estas credenciales:
+   ```bash
+   sudo systemctl restart edge.service
+   ```
+4. Una vez validado el funcionamiento, revoque el token anterior desde la UI de InfluxDB para evitar usos no autorizados.
 
 ### Sensores y adquisición (`edge/config/sensors.yaml`)
 Ajuste los canales, nombres, unidades y calibraciones según su montaje. Ejemplo incluido:
