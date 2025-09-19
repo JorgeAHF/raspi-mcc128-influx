@@ -2,3 +2,4 @@ daqhats
 requests
 python-dotenv
 pyyaml
+responses
