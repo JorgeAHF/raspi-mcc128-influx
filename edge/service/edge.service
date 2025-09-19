@@ -7,7 +7,7 @@ Wants=network-online.target
 User=pi
 WorkingDirectory=/home/pi/raspi-mcc128-influx/edge
 EnvironmentFile=/home/pi/raspi-mcc128-influx/edge/.env
-ExecStart=/usr/bin/python3 /home/pi/raspi-mcc128-influx/edge/src/acquire.py
+ExecStart=/usr/bin/python3 /home/pi/raspi-mcc128-influx/edge/scr/acquire.py
 Restart=on-failure
 
 [Install]
