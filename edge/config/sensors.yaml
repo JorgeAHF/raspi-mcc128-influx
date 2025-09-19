@@ -1,0 +1,14 @@
+station_id: rpi5-a
+sample_rate_hz: 100
+scan_block_size: 1000       # bloques de 10 s (ejemplo)
+channels:
+  - ch: 0
+    sensor: LVDT_P1
+    unit: mm
+    v_range: 10             # ±10 V en MCC128
+    calib: {gain: 2.000, offset: -0.10}   # mm = gain*V + offset
+  - ch: 1
+    sensor: LVDT_P2
+    unit: mm
+    v_range: 10
+    calib: {gain: 2.000, offset: 0.00}
