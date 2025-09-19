@@ -80,3 +80,4 @@ def test_send_aborts_on_unauthorized(caplog):
     error_logs = [record.message for record in caplog.records if record.levelno >= logging.ERROR]
     assert any("HTTP 401" in msg for msg in error_logs)
     assert any("attempt 1/3" in msg for msg in error_logs)
+

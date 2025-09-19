@@ -95,6 +95,7 @@ class InfluxSender:
         return max(value, minimum)
 
     def _worker(self):
+
         while not self.stop:
             lines = self._drain_batch()
             if not lines:
@@ -242,6 +243,7 @@ class InfluxSender:
     def _drop_oldest(self, context: str) -> bool:
         try:
             self.q.get_nowait()
+            self.q.task_done()
         except queue.Empty:
             logger.warning(
                 "InfluxSender detected queue overflow during %s but found queue empty; dropping pending data.",
