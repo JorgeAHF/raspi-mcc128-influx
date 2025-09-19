@@ -48,6 +48,7 @@ pip install -r requirements.txt
    ```
    Debe responder `200 OK`. Un `401` indica token/organización incorrectos.
 
+3. Opcionalmente puede ajustar el comportamiento del envío agregando variables como `INFLUX_BATCH_SIZE`, `INFLUX_RETRY_MAX_ATTEMPTS`, `INFLUX_RETRY_BASE_DELAY_S` e `INFLUX_RETRY_MAX_BACKOFF_S` para controlar el tamaño del lote y la estrategia de reintentos (ver `.env.example`).
 > **Importante:** Nunca suba el archivo `.env` al repositorio. El archivo ya está listado en `.gitignore`, pero confirme con `git status` antes de hacer commits para evitar incluir credenciales por error.
 
 ### Rotación del token de InfluxDB
