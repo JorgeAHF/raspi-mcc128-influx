@@ -26,11 +26,12 @@ def _load_dotenv_if_needed():
 _load_dotenv_if_needed()
 
 class InfluxSender:
-    def __init__(self):
+    def __init__(self, metrics=None):
         self.url = os.getenv("INFLUX_URL")  # ej. http://WINDOWS_IP:8086
         self.org = os.getenv("INFLUX_ORG")
         self.bucket = os.getenv("INFLUX_BUCKET")
         self.token = os.getenv("INFLUX_TOKEN")
+        self.metrics = metrics
         missing = [
             name
             for name, value in (
@@ -80,15 +81,22 @@ class InfluxSender:
                         r.status_code,
                         len(lines),
                     )
+                    if self.metrics is not None:
+                        self.metrics.increment_http_retry(len(lines))
                     # re-enqueue si falla (simple)
                     self._queue_lines(lines, context=f"HTTP {r.status_code} retry")
                     time.sleep(2)
+                else:
+                    if self.metrics is not None:
+                        self.metrics.increment_samples_sent(len(lines))
             except Exception as exc:
                 logger.warning(
                     "InfluxSender write raised %s; re-queueing %d lines.",
                     exc,
                     len(lines),
                 )
+                if self.metrics is not None:
+                    self.metrics.increment_http_retry(len(lines))
                 self._queue_lines(lines, context=f"exception {type(exc).__name__}")
                 time.sleep(2)
 
@@ -124,6 +132,8 @@ class InfluxSender:
                         "InfluxSender unable to enqueue data during %s due to persistent congestion; dropping sample.",
                         context,
                     )
+                    if self.metrics is not None:
+                        self.metrics.increment_dropped_samples(1)
                     return
 
     def _drop_oldest(self, context: str) -> bool:
@@ -134,11 +144,15 @@ class InfluxSender:
                 "InfluxSender detected queue overflow during %s but found queue empty; dropping pending data.",
                 context,
             )
+            if self.metrics is not None:
+                self.metrics.report_queue_overrun(0)
             return False
         logger.warning(
             "InfluxSender queue full during %s; dropping oldest sample to relieve congestion.",
             context,
         )
+        if self.metrics is not None:
+            self.metrics.report_queue_overrun(1)
         return True
 
 def _escape_key(value: str) -> str:

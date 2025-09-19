@@ -71,6 +71,7 @@ channels:
 |---------------------------|-------------------------------------|-------------------|-------------|
 | `sample_rate_hz`          | `edge/config/sensors.yaml`          | `10` Hz           | Frecuencia de muestreo por canal (`fs`). Ajuste según la dinámica del sensor y el ancho de banda requerido.【F:edge/config/sensors.yaml†L1-L12】 |
 | `scan_block_size`         | `edge/config/sensors.yaml`          | `50` muestras     | Tamaño del bloque leído en cada iteración. Define la latencia (~5 s a 10 Hz) y se usa para calcular el timeout dinámico.【F:edge/config/sensors.yaml†L3-L8】【F:edge/scr/mcc_reader.py†L8-L33】 |
+| `metrics_log_interval_s`  | `edge/config/sensors.yaml`          | `30` s            | Intervalo entre logs INFO con contadores acumulados de adquisición y envío. Puede sobreescribirse con `DAQ_METRICS_LOG_INTERVAL_S`.【F:edge/config/sensors.yaml†L1-L12】【F:edge/scr/acquire.py†L69-L99】 |
 | `DEFAULT_TIMEOUT_MARGIN_S`| `edge/scr/mcc_reader.py`            | `0.5` s           | Margen extra sumado al tiempo esperado del bloque (`block_size/fs + margen`) para evitar timeouts espurios.【F:edge/scr/mcc_reader.py†L19-L35】 |
 
 ## Guía de calibración (`gain` / `offset`)
@@ -108,6 +109,15 @@ cd ~/projects/raspi-mcc128-influx/edge
 source ~/venv-daq/bin/activate
 python scr/acquire.py
 ```
+
+## Métricas y observabilidad
+- Al iniciar `scr/acquire.py` se configura `logging` con el hash corto del commit, nivel configurable vía `DAQ_LOG_LEVEL` y mensajes en formato `%(asctime)s %(levelname)s [commit:XXXXXXX] %(name)s: %(message)s`. Esto facilita rastrear exactamente qué versión está corriendo.【F:edge/scr/acquire.py†L18-L72】
+- Durante la adquisición se acumulan contadores como bloques procesados, muestras leídas/enviadas, reintentos HTTP, overruns y muestras descartadas. Se emiten en nivel INFO como líneas JSON de la forma `acquisition_metrics {"type": "acquisition_metrics", ...}` cada `metrics_log_interval_s` segundos (por defecto 30 s). Use `DAQ_METRICS_LOG_INTERVAL_S` para forzar un intervalo distinto desde el entorno.【F:edge/scr/acquire.py†L74-L125】【F:edge/scr/metrics.py†L1-L76】
+- Las métricas se estructuran como:
+  - `counters`: valores acumulados desde que inició el proceso.
+  - `delta`: incremento desde el último log, útil para ver la actividad reciente sin restar manualmente.
+  - `uptime_s` e `interval_s`: segundos totales y ventana cubierta por ese registro.
+  Puede ingerir estas líneas como JSON desde `journalctl` o enviar a Prometheus mediante un sidecar que lea los logs.【F:edge/scr/metrics.py†L42-L76】
 
 ## Instalación del servicio `edge.service`
 1. Ajuste rutas, usuario y entorno virtual en `edge/service/edge.service` según su sistema (edite `User`, `WorkingDirectory`, `EnvironmentFile` y `ExecStart`).【F:edge/service/edge.service†L1-L13】

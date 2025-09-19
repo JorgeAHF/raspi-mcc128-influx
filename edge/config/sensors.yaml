@@ -1,6 +1,7 @@
 station_id: rpi5-a
 sample_rate_hz: 10
 scan_block_size: 50         # bloque de 5 s -> timeout dinámico = 5 s + 0.5 s de margen
+metrics_log_interval_s: 30   # segundos entre logs de métricas acumuladas
 channels:
   - ch: 0
     sensor: LVDT_P1
