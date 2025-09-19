@@ -141,7 +141,55 @@ class InfluxSender:
         )
         return True
 
+def _escape_key(value: str) -> str:
+    """Escape measurement, tag and field keys for Influx line protocol."""
+
+    return (
+        str(value)
+        .replace("\\", r"\\\\")
+        .replace(",", r"\\,")
+        .replace(" ", r"\\ ")
+        .replace("=", r"\\=")
+    )
+
+
+def _escape_tag_value(value) -> str:
+    """Escape tag values as specified by the Influx line protocol."""
+
+    return _escape_key(value)
+
+
+def _format_field_value(value) -> str:
+    """Format a field value according to the Influx line protocol."""
+
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int) and not isinstance(value, bool):
+        return f"{value}i"
+    if isinstance(value, float):
+        return format(value, ".15g")
+
+    escaped = (
+        str(value)
+        .replace("\\", r"\\\\")
+        .replace("\"", r"\\\"")
+        .replace("\n", r"\\n")
+    )
+    return f'"{escaped}"'
+
+
 def to_line(meas, tags: dict, fields: dict, ts_ns: int):
-    t = ",".join(f"{k}={v}" for k,v in tags.items())
-    f = ",".join(f'{k}={v}' if isinstance(v,(int,float)) else f'{k}="{v}"' for k,v in fields.items())
-    return f"{meas},{t} {f} {ts_ns}"
+    measurement = _escape_key(meas)
+    tags_payload = ",".join(
+        f"{_escape_key(k)}={_escape_tag_value(v)}" for k, v in sorted(tags.items())
+    )
+    fields_payload = ",".join(
+        f"{_escape_key(k)}={_format_field_value(v)}" for k, v in fields.items()
+    )
+
+    if tags_payload:
+        prefix = f"{measurement},{tags_payload}"
+    else:
+        prefix = measurement
+
+    return f"{prefix} {fields_payload} {ts_ns}"
