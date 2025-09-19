@@ -16,16 +16,20 @@ def main():
     sender = InfluxSender()
     map_cal = {c["ch"]:(c["sensor"], c["unit"], c["calib"]["gain"], c["calib"]["offset"]) for c in cfg["channels"]}
 
+    ts_step = int(1e9 / fs)
+
     while True:
         raw = read_block(board, ch_mask, block, chans)
         now_ns = time_ns()
+        block_len = len(raw[chans[0]]) if chans else 0
+        if block_len == 0:
+            continue
+        ts0 = now_ns - ts_step * (block_len - 1)
         # para cada canal, aplica calibración y envía cada muestra
         for ch in chans:
             sensor, unit, gain, offset = map_cal[ch]
             vals = apply_calibration(raw[ch], gain, offset)
             # empaqueta por muestra (si el volumen es alto, agrega por estadísticos por bloque)
-            ts_step = int(1e9 / fs)
-            ts0 = now_ns - ts_step*(len(vals)-1)
             for i, mm in enumerate(vals):
                 line = to_line(
                     "lvdt",
