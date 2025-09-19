@@ -54,6 +54,8 @@ Ajuste los canales, nombres, unidades y calibraciones según su montaje. Ejemplo
 station_id: rpi5-a
 sample_rate_hz: 10
 scan_block_size: 50         # bloque de 5 s -> timeout dinámico = 5 s + 0.5 s de margen
+drift_detection:
+  correction_threshold_ns: 2000000   # corrige derivas mayores a 2 ms
 channels:
   - ch: 0
     sensor: LVDT_P1
@@ -71,7 +73,14 @@ channels:
 |---------------------------|-------------------------------------|-------------------|-------------|
 | `sample_rate_hz`          | `edge/config/sensors.yaml`          | `10` Hz           | Frecuencia de muestreo por canal (`fs`). Ajuste según la dinámica del sensor y el ancho de banda requerido.【F:edge/config/sensors.yaml†L1-L12】 |
 | `scan_block_size`         | `edge/config/sensors.yaml`          | `50` muestras     | Tamaño del bloque leído en cada iteración. Define la latencia (~5 s a 10 Hz) y se usa para calcular el timeout dinámico.【F:edge/config/sensors.yaml†L3-L8】【F:edge/scr/mcc_reader.py†L8-L33】 |
+| `drift_detection.correction_threshold_ns` | `edge/config/sensors.yaml` | `2_000_000` ns    | Umbral opcional para realinear el acumulador de timestamps con el reloj del sistema cuando la deriva supera ese valor. Si la desviación permanece por debajo, sólo se registran los valores observados.【F:edge/config/sensors.yaml†L3-L9】【F:edge/scr/acquire.py†L58-L96】 |
 | `DEFAULT_TIMEOUT_MARGIN_S`| `edge/scr/mcc_reader.py`            | `0.5` s           | Margen extra sumado al tiempo esperado del bloque (`block_size/fs + margen`) para evitar timeouts espurios.【F:edge/scr/mcc_reader.py†L19-L35】 |
+
+## Monitoreo de jitter y deriva
+- El colector asigna timestamps consecutivos a cada muestra con un acumulador `next_ts_ns`, evitando recalcularlos a partir del reloj en cada bloque y eliminando el jitter intra-bloque.【F:edge/scr/acquire.py†L1-L97】
+- Tras cada lectura se registra en `INFO` la desviación máxima observada entre el último timestamp del bloque y el reloj del sistema (`Bloque con ...; desviación máxima ...`). Valores pequeños (p. ej. <1 ms) indican latencias estables; si aumentan, conviene revisar carga de CPU o bloqueos de I/O.【F:edge/scr/acquire.py†L67-L97】
+- Cuando `drift_detection.correction_threshold_ns` está definido y la deriva supera ese umbral, se alinea el acumulador con `time_ns()` y se anota un `DEBUG` con el ajuste aplicado, lo que evita que los timestamps se desfasen progresivamente.【F:edge/config/sensors.yaml†L3-L9】【F:edge/scr/acquire.py†L48-L96】
+
 
 ## Guía de calibración (`gain` / `offset`)
 - Cada canal aplica la relación lineal `magnitud = gain * Voltaje + offset` definida en `calib`.
