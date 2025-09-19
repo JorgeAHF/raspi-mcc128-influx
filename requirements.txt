@@ -1,0 +1,4 @@
+daqhats
+requests
+python-dotenv
+pyyaml
