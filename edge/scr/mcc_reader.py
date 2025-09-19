@@ -18,8 +18,23 @@ def start_scan(board, channels, fs_hz, v_range=AnalogInputRange.BIP_10V, block_s
     )
     return ch_mask, block_samples
 
-def read_block(board, ch_mask, block_samples, channels):
-    data = board.a_in_scan_read(block_samples, 5.0)  # timeout 5s
+DEFAULT_TIMEOUT_MARGIN_S = 0.5
+
+def read_block(board, ch_mask, block_samples, channels, timeout=None, sample_rate_hz=None, safety_margin_s=DEFAULT_TIMEOUT_MARGIN_S):
+    """Lee un bloque de muestras del MCC128.
+
+    Si ``timeout`` no se provee, se calcula como la duración esperada del
+    bloque (``block_samples / sample_rate_hz``) más un margen de seguridad
+    ``safety_margin_s``. Esto evita un valor fijo que pudiera resultar muy
+    corto cuando se cambia ``block_samples`` o la frecuencia de muestreo.
+    """
+    if timeout is None:
+        if sample_rate_hz is None or sample_rate_hz <= 0:
+            raise ValueError("Se requiere sample_rate_hz para calcular timeout dinámico")
+        block_duration_s = block_samples / float(sample_rate_hz)
+        timeout = block_duration_s + safety_margin_s
+
+    data = board.a_in_scan_read(block_samples, timeout)
     if data.hardware_overrun or data.buffer_overrun:
         raise RuntimeError("Overrun de hardware/buffer")
     # data.data -> lista intercalada por canal

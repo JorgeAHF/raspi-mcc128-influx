@@ -2,7 +2,7 @@ import os, time
 import yaml
 from time import time_ns
 from daqhats import AnalogInputRange
-from mcc_reader import open_mcc128, start_scan, read_block
+from mcc_reader import open_mcc128, start_scan, read_block, DEFAULT_TIMEOUT_MARGIN_S
 from calibrate import apply_calibration
 from sender import InfluxSender, to_line
 
@@ -18,8 +18,11 @@ def main():
 
     ts_step = int(1e9 / fs)
 
+    block_duration_s = block / float(fs) if fs else 0.0
+    timeout_s = block_duration_s + DEFAULT_TIMEOUT_MARGIN_S
+
     while True:
-        raw = read_block(board, ch_mask, block, chans)
+        raw = read_block(board, ch_mask, block, chans, timeout=timeout_s)
         now_ns = time_ns()
         block_len = len(raw[chans[0]]) if chans else 0
         if block_len == 0:
