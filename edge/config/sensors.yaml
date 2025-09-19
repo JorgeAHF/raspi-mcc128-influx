@@ -1,6 +1,8 @@
 station_id: rpi5-a
 sample_rate_hz: 10
 scan_block_size: 50         # bloque de 5 s -> timeout dinámico = 5 s + 0.5 s de margen
+drift_detection:
+  correction_threshold_ns: 2000000   # corrige derivas >2 ms (opcional)
 channels:
   - ch: 0
     sensor: LVDT_P1
