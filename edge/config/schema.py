@@ -99,6 +99,7 @@ class AcquisitionSettings:
     sample_rate_hz: float
     block_size: int = 1000
     duration_s: Optional[float] = None
+    total_samples: Optional[int] = None
     drift_detection: DriftDetectionSettings = field(default_factory=DriftDetectionSettings)
 
     @classmethod
@@ -116,11 +117,20 @@ class AcquisitionSettings:
         if duration is not None and duration <= 0:
             raise ValueError("duration_s debe ser > 0")
 
+        samples_raw = data.get("total_samples")
+        if samples_raw is None or samples_raw == "":
+            total_samples = None
+        else:
+            total_samples = _as_int(samples_raw, "total_samples")
+            if total_samples <= 0:
+                raise ValueError("total_samples debe ser > 0")
+
         drift = DriftDetectionSettings.from_mapping(data.get("drift_detection"))
         return cls(
             sample_rate_hz=sample_rate,
             block_size=block_size,
             duration_s=duration,
+            total_samples=total_samples,
             drift_detection=drift,
         )
 
@@ -129,6 +139,7 @@ class AcquisitionSettings:
             "sample_rate_hz": self.sample_rate_hz,
             "block_size": self.block_size,
             "duration_s": self.duration_s,
+            "total_samples": self.total_samples,
             "drift_detection": self.drift_detection.to_dict(),
         }
         return payload

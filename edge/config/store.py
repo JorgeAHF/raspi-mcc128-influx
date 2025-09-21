@@ -43,6 +43,7 @@ def convert_legacy_station_payload(raw: Mapping[str, Any]) -> Dict[str, Any]:
         "sample_rate_hz": raw.get("sample_rate_hz"),
         "scan_block_size": raw.get("scan_block_size"),
         "duration_s": raw.get("duration_s"),
+        "total_samples": raw.get("total_samples"),
     }
 
     drift = raw.get("drift_detection")

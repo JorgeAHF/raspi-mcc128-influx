@@ -3,6 +3,7 @@ acquisition:
   sample_rate_hz: 10
   block_size: 50
   duration_s:
+  total_samples:
   drift_detection:
     correction_threshold_ns: 2000000
 channels:
