@@ -1,98 +1,54 @@
+from __future__ import annotations
+
 import logging
-import os
 import queue
 import random
 import threading
 import time
-from pathlib import Path
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, TYPE_CHECKING
 
 import requests
 
+if TYPE_CHECKING:  # pragma: no cover - hints only
+    from edge.config.schema import StorageSettings
+
 
 logger = logging.getLogger(__name__)
-
-
-def _running_under_systemd() -> bool:
-    return any(os.getenv(var) for var in ("INVOCATION_ID", "SYSTEMD_EXEC_PID", "JOURNAL_STREAM"))
-
-
-def _load_dotenv_if_needed():
-    if _running_under_systemd():
-        return
-    try:
-        from dotenv import load_dotenv  # type: ignore
-    except ImportError:
-        logger.warning("python-dotenv no está disponible; continúo sin cargar .env")
-        return
-
-    env_path = Path(__file__).resolve().parents[1] / ".env"
-    load_dotenv(env_path, override=False)
-
-
-_load_dotenv_if_needed()
 
 RETRIABLE_4XX = {408, 409, 425, 429}
 
 
 class InfluxSender:
-    def __init__(self, *, session: Optional[requests.Session] = None, start_worker: bool = True):
-        self.url = os.getenv("INFLUX_URL")  # ej. http://WINDOWS_IP:8086
-        self.org = os.getenv("INFLUX_ORG")
-        self.bucket = os.getenv("INFLUX_BUCKET")
-        self.token = os.getenv("INFLUX_TOKEN")
-        self.batch_size = self._read_int_env("INFLUX_BATCH_SIZE", default=5, minimum=1)
-        self.max_attempts = self._read_int_env("INFLUX_RETRY_MAX_ATTEMPTS", default=5, minimum=1)
-        self.base_backoff = self._read_float_env("INFLUX_RETRY_BASE_DELAY_S", default=1.0, minimum=0.0)
-        self.max_backoff = self._read_float_env("INFLUX_RETRY_MAX_BACKOFF_S", default=30.0, minimum=0.0)
-        self.timeout = self._read_float_env("INFLUX_TIMEOUT_S", default=5.0, minimum=0.1)
-        missing = [
-            name
-            for name, value in (
-                ("INFLUX_URL", self.url),
-                ("INFLUX_ORG", self.org),
-                ("INFLUX_BUCKET", self.bucket),
-                ("INFLUX_TOKEN", self.token),
+    def __init__(
+        self,
+        settings: "StorageSettings",
+        *,
+        session: Optional[requests.Session] = None,
+        start_worker: bool = True,
+    ):
+        if settings.driver.lower() != "influxdb_v2":
+            logger.warning(
+                "Storage driver '%s' no reconocido; se utilizará el flujo InfluxDB v2 por defecto.",
+                settings.driver,
             )
-            if not value
-        ]
-        if missing:
-            if _running_under_systemd():
-                hint = (
-                    "Defina las variables faltantes en el archivo de servicio systemd, por ejemplo con "
-                    "Environment=INFLUX_URL=..."
-                )
-            else:
-                hint = "Defina las variables faltantes en edge/.env o expórtelas en su shell antes de ejecutar."
-            raise RuntimeError(
-                "Faltan configuraciones obligatorias: %s. %s" % (", ".join(missing), hint)
-            )
-        self.q = queue.Queue(maxsize=1000)
+
+        self.settings = settings
+        self._write_url = f"{settings.url.rstrip('/')}/api/v2/write?org={settings.org}&bucket={settings.bucket}&precision=ns"
+        self.batch_size = settings.batch_size
+        self.max_attempts = settings.retry.max_attempts
+        self.base_backoff = settings.retry.base_delay_s
+        self.max_backoff = settings.retry.max_backoff_s
+        self.timeout = settings.timeout_s
+        self.token = settings.token
+        self.q = queue.Queue(maxsize=settings.queue_max_size)
         self.stop = False
         self.session = session or requests.Session()
+        self.session.verify = settings.verify_ssl
         self._sleep = time.sleep
         self._worker_thread: Optional[threading.Thread] = None
         if start_worker:
             self._worker_thread = threading.Thread(target=self._worker, daemon=True)
             self._worker_thread.start()
-
-    @staticmethod
-    def _read_int_env(name: str, default: int, minimum: int) -> int:
-        try:
-            value = int(os.getenv(name, default))
-        except ValueError:
-            logger.warning("Valor inválido para %s; usando %s", name, default)
-            value = default
-        return max(value, minimum)
-
-    @staticmethod
-    def _read_float_env(name: str, default: float, minimum: float) -> float:
-        try:
-            value = float(os.getenv(name, default))
-        except ValueError:
-            logger.warning("Valor inválido para %s; usando %s", name, default)
-            value = default
-        return max(value, minimum)
 
     def _worker(self):
 
@@ -125,7 +81,7 @@ class InfluxSender:
     def _send_with_retries(self, lines: Iterable[str]) -> bool:
         data = "\n".join(lines)
         headers = {"Authorization": f"Token {self.token}"}
-        url = f"{self.url}/api/v2/write?org={self.org}&bucket={self.bucket}&precision=ns"
+        url = self._write_url
         for attempt in range(1, self.max_attempts + 1):
             try:
                 response = self.session.post(url, headers=headers, data=data, timeout=self.timeout)
