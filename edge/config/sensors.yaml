@@ -1,16 +1,22 @@
 station_id: rpi5-a
-sample_rate_hz: 10
-scan_block_size: 50         # bloque de 5 s -> timeout dinámico = 5 s + 0.5 s de margen
-drift_detection:
-  correction_threshold_ns: 2000000   # corrige derivas >2 ms (opcional)
+acquisition:
+  sample_rate_hz: 10
+  block_size: 50
+  duration_s:
+  drift_detection:
+    correction_threshold_ns: 2000000
 channels:
-  - ch: 0
-    sensor: LVDT_P1
+  - index: 0
+    name: LVDT_P1
     unit: mm
-    v_range: 10             # ±10 V en MCC128
-    calib: {gain: 2.000, offset: -0.10}   # mm = gain*V + offset
-  - ch: 1
-    sensor: LVDT_P2
+    voltage_range: 10.0
+    calibration:
+      gain: 2.0
+      offset: -0.1
+  - index: 1
+    name: LVDT_P2
     unit: mm
-    v_range: 10
-    calib: {gain: 2.000, offset: 0.00}
+    voltage_range: 10.0
+    calibration:
+      gain: 2.0
+      offset: 0.0

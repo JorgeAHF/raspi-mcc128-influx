@@ -3,11 +3,17 @@ import sys
 from pathlib import Path
 
 import pytest
-import yaml
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 # Allow importing scripts from the edge/scr directory.
-sys.path.append(str(Path(__file__).resolve().parents[1] / "edge" / "scr"))
+SCR_PATH = ROOT / "edge" / "scr"
+if str(SCR_PATH) not in sys.path:
+    sys.path.append(str(SCR_PATH))
 
+from edge.config import load_station_config  # type: ignore  # noqa: E402
 from calibrate import apply_calibration  # type: ignore  # noqa: E402
 
 
@@ -30,19 +36,14 @@ def test_apply_calibration_varied_inputs(voltages, gain, offset, expected):
 def test_sensor_calibration_entries_are_numeric():
     """Each configured channel must define numeric gain and offset values."""
 
-    config_path = Path(__file__).resolve().parents[1] / "edge" / "config" / "sensors.yaml"
-    with config_path.open("r", encoding="utf-8") as f:
-        sensors_config = yaml.safe_load(f)
+    config_path = ROOT / "edge" / "config" / "sensors.yaml"
+    station = load_station_config(config_path)
 
-    channels = sensors_config.get("channels", [])
-    assert channels, "No channels defined in sensors configuration"
+    assert station.channels, "No channels defined in sensors configuration"
 
-    for channel in channels:
-        calib = channel.get("calib")
-        assert isinstance(calib, dict), f"Channel {channel} missing calibration info"
-
-        for key in ("gain", "offset"):
-            assert key in calib, f"Calibration entry missing '{key}'"
-            value = calib[key]
-            assert isinstance(value, (int, float)), f"{key} is not numeric: {value!r}"
-            assert not math.isnan(value), f"{key} must not be NaN"
+    for channel in station.channels:
+        value_gain = channel.calibration.gain
+        value_offset = channel.calibration.offset
+        for label, value in ("gain", value_gain), ("offset", value_offset):
+            assert isinstance(value, (int, float)), f"{label} is not numeric: {value!r}"
+            assert not math.isnan(value), f"{label} must not be NaN"

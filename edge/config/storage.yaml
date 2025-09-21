@@ -1,0 +1,14 @@
+# Configuración de almacenamiento (InfluxDB v2)
+driver: influxdb_v2
+url: http://localhost:8086
+org: example-org
+bucket: example-bucket
+token: replace-with-real-token
+batch_size: 5
+timeout_s: 5.0
+queue_max_size: 1000
+verify_ssl: true
+retry:
+  max_attempts: 5
+  base_delay_s: 1.0
+  max_backoff_s: 30.0

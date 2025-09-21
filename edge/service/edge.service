@@ -6,8 +6,7 @@ Wants=network-online.target
 [Service]
 User=JJSI
 WorkingDirectory=/home/JJSI/projects/raspi-mcc128-influx/edge
-EnvironmentFile=/home/JJSI/projects/raspi-mcc128-influx/edge/.env
-ExecStart=/home/JJSI/venv-daq/bin/python /home/JJSI/projects/raspi-mcc128-influx/edge/src/acquire.py
+ExecStart=/home/JJSI/venv-daq/bin/python /home/JJSI/projects/raspi-mcc128-influx/edge/scr/acquire.py
 Restart=on-failure
 
 [Install]
