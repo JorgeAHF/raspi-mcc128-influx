@@ -83,6 +83,7 @@ acquisition:
   sample_rate_hz: 10
   block_size: 50         # bloque de 5 s -> timeout dinámico = 5 s + 0.5 s de margen
   duration_s:
+  total_samples:
   drift_detection:
     correction_threshold_ns: 2000000   # corrige derivas mayores a 2 ms
 channels:
@@ -98,11 +99,17 @@ channels:
     calibration: {gain: 2.000, offset: 0.00}
 ```
 
+> **Nota:** la MCC128 aplica un único rango de entrada para todos los canales
+> habilitados. Configure el mismo `voltage_range` en cada canal; de lo
+> contrario la inicialización fallará con un error explicando la
+> limitación.【F:edge/scr/mcc_reader.py†L1-L71】
+
 | Parámetro                 | Ubicación                           | Valor por defecto | Descripción |
 |---------------------------|-------------------------------------|-------------------|-------------|
 | `acquisition.sample_rate_hz` | `edge/config/sensors.yaml`       | `10` Hz           | Frecuencia de muestreo por canal (`fs`). Ajuste según la dinámica del sensor y el ancho de banda requerido.【F:edge/config/sensors.yaml†L1-L18】 |
-| `acquisition.block_size`  | `edge/config/sensors.yaml`          | `50` muestras     | Tamaño del bloque leído en cada iteración. Define la latencia (~5 s a 10 Hz) y se usa para calcular el timeout dinámico.【F:edge/config/sensors.yaml†L1-L18】【F:edge/scr/mcc_reader.py†L8-L33】 |
-| `acquisition.drift_detection.correction_threshold_ns` | `edge/config/sensors.yaml` | `2_000_000` ns | Umbral opcional para realinear el acumulador de timestamps con el reloj del sistema cuando la deriva supera ese valor.【F:edge/config/sensors.yaml†L1-L18】【F:edge/scr/acquire.py†L70-L120】 |
+| `acquisition.block_size`  | `edge/config/sensors.yaml`          | `50` muestras     | Tamaño del bloque leído en cada iteración. Define la latencia (~5 s a 10 Hz) y se usa para calcular el timeout dinámico.【F:edge/config/sensors.yaml†L1-L18】【F:edge/scr/mcc_reader.py†L52-L94】 |
+| `acquisition.total_samples` | `edge/config/sensors.yaml`        | `null`            | Presupuesto máximo de muestras por canal. Activa el modo `timed` y detiene la adquisición tras alcanzarlo.【F:edge/config/sensors.yaml†L1-L18】【F:edge/scr/acquisition.py†L68-L126】 |
+| `acquisition.drift_detection.correction_threshold_ns` | `edge/config/sensors.yaml` | `2_000_000` ns | Umbral opcional para realinear el acumulador de timestamps con el reloj del sistema cuando la deriva supera ese valor.【F:edge/config/sensors.yaml†L1-L18】【F:edge/scr/acquisition.py†L68-L126】 |
 | `DEFAULT_TIMEOUT_MARGIN_S`| `edge/scr/mcc_reader.py`            | `0.5` s           | Margen extra sumado al tiempo esperado del bloque (`block_size/fs + margen`) para evitar timeouts espurios.【F:edge/scr/mcc_reader.py†L19-L35】 |
 
 ## Monitoreo de jitter y deriva
