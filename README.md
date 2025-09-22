@@ -154,6 +154,13 @@ source ~/venv-daq/bin/activate
 python scr/acquire.py
 ```
 
+## Modo test y vista previa web
+- Ejecute el `AcquisitionRunner` con `mode="test"` para omitir los sinks de almacenamiento y publicar cada bloque calibrado en un canal de broadcast (por ejemplo un `asyncio.Queue`).【F:edge/scr/acquisition.py†L118-L197】
+- El helper `stream_preview` de `edge/scr/preview.py` consume esa cola y genera un async iterable listo para la API web, aplicando filtros de canales, duración y un `downsample` configurable para reducir ancho de banda.【F:edge/scr/preview.py†L1-L134】
+- Limite el `downsample` y la duración (`max_duration_s`) según lo solicitado por el cliente; se reutilizan los mismos índices de canal definidos en `sensors.yaml`, y se validan contra la configuración vigente.【F:edge/scr/preview.py†L26-L75】【F:edge/config/sensors.yaml†L1-L18】
+- **Limitaciones:** el modo test no inicializa sinks pesados (Influx/CSV/FTP) para evitar contención con almacenamiento concurrente. Si necesita almacenar y previsualizar simultáneamente, ejecute instancias separadas o utilice colas con backpressure controlado.【F:edge/scr/acquisition.py†L134-L150】
+- Métricas en logs: se informa cada bloque emitido (`DEBUG`) y un resumen al finalizar (`INFO`) con bloques y muestras entregadas, útil para monitorear latencias y tamaño de cola.【F:edge/scr/acquisition.py†L211-L253】
+
 ## Instalación del servicio `edge.service`
 1. Ajuste rutas, usuario y entorno virtual en `edge/service/edge.service` según su sistema (edite `User`, `WorkingDirectory`, `EnvironmentFile` y `ExecStart`).【F:edge/service/edge.service†L1-L13】
 2. Copie el archivo a systemd y recargue la configuración:
