@@ -184,6 +184,36 @@ python scr/acquire.py
   - Rote periódicamente el token de la API y utilice usuarios de sólo lectura si entrega acceso a terceros.【F:edge/webui/src/App.tsx†L72-L122】
   - El token se almacena en `localStorage`; limpie el navegador al terminar sesiones compartidas y evite ejecutarlo en quioscos no gestionados.
 
+### Habilitar la autenticación de la API
+- La API verifica un token Bearer cuando se definen las variables de entorno `EDGE_WEBAPI_TOKEN` o `EDGE_WEBAPI_TOKEN_FILE`; si ninguna está presente, la autenticación queda deshabilitada y todas las solicitudes son aceptadas.【F:edge/webapi/auth.py†L16-L52】
+- Puede definir el token directamente en `edge/.env`, que se lee desde `webapi.service` gracias a `EnvironmentFile=`:
+  ```ini
+  # edge/.env
+  EDGE_WEBAPI_TOKEN=token-super-secreto
+  ```
+  Si prefiere mantener el valor fuera de los archivos de entorno, apunte a un fichero dedicado y restrinja sus permisos:
+  ```ini
+  # edge/.env
+  EDGE_WEBAPI_TOKEN_FILE=/home/JJSI/projects/raspi-mcc128-influx/edge/secrets/webapi.token
+  ```
+  ```bash
+  install -m 600 -o JJSI -g JJSI /dev/stdin /home/JJSI/projects/raspi-mcc128-influx/edge/secrets/webapi.token <<'EOF'
+  token-super-secreto
+  EOF
+  ```
+- En despliegues gestionados con systemd puede declarar el token en la propia unidad, por ejemplo editando `/etc/systemd/system/webapi.service`:
+  ```ini
+  Environment=EDGE_WEBAPI_TOKEN=token-super-secreto
+  # o, para un archivo externo
+  Environment=EDGE_WEBAPI_TOKEN_FILE=/etc/edge/webapi.token
+  ```
+  Recuerde aplicar permisos `600` y propietario adecuado al archivo referenciado para evitar accesos no autorizados.
+- Cada vez que cambie el token reinicie el servicio para recargar la configuración:
+  ```bash
+  sudo systemctl restart webapi.service
+  ```
+  Tras el reinicio, abra la SPA y actualice el token almacenado en su administrador de credenciales para evitar errores 401 debidos a valores obsoletos en `localStorage`.
+
 ## Servicios systemd (adquisición y API)
 1. Ajuste rutas, usuario y entorno virtual en `edge/service/edge.service` y `edge/service/webapi.service` según su sistema (valores por defecto pensados para `~/projects/raspi-mcc128-influx` y `~/venv-daq`).【F:edge/service/edge.service†L1-L16】【F:edge/service/webapi.service†L1-L16】
 2. Copie los archivos a systemd y recargue la configuración:
