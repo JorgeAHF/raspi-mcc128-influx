@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Mapping, Optional
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
 
 
 def _as_str(value: Any, field_name: str, *, optional: bool = False) -> Optional[str]:
@@ -244,6 +244,152 @@ class RetrySettings:
 
 
 @dataclass
+class CSVSinkSettings:
+    enabled: bool = False
+    directory: str = "./data"
+    rotation: str = "session"  # valores: "session", "daily"
+    filename_prefix: str = "samples"
+    timestamp_format: str = "%Y-%m-%dT%H:%M:%S.%fZ"
+    delimiter: str = ","
+    decimal: str = "."
+    encoding: str = "utf-8"
+    newline: str = ""
+    write_headers: bool = True
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> "CSVSinkSettings":
+        if not data:
+            return cls()
+        enabled = _as_bool(data.get("enabled"), False)
+        directory = _as_str(data.get("directory", "./data"), "csv.directory") or "./data"
+        rotation = _as_str(data.get("rotation", "session"), "csv.rotation") or "session"
+        rotation = rotation.lower()
+        if rotation not in {"session", "daily", "date"}:
+            raise ValueError("csv.rotation debe ser 'session' o 'daily'")
+        if rotation == "date":
+            rotation = "daily"
+        filename_prefix = _as_str(
+            data.get("filename_prefix", "samples"),
+            "csv.filename_prefix",
+        ) or "samples"
+        ts_format = _as_str(
+            data.get("timestamp_format", "%Y-%m-%dT%H:%M:%S.%fZ"),
+            "csv.timestamp_format",
+        ) or "%Y-%m-%dT%H:%M:%S.%fZ"
+        delimiter = _as_str(data.get("delimiter", ","), "csv.delimiter") or ","
+        decimal = _as_str(data.get("decimal", "."), "csv.decimal") or "."
+        encoding = _as_str(data.get("encoding", "utf-8"), "csv.encoding") or "utf-8"
+        newline = str(data.get("newline", ""))
+        write_headers = _as_bool(data.get("write_headers"), True)
+        return cls(
+            enabled=enabled,
+            directory=directory,
+            rotation=rotation,
+            filename_prefix=filename_prefix,
+            timestamp_format=ts_format,
+            delimiter=delimiter,
+            decimal=decimal,
+            encoding=encoding,
+            newline=newline,
+            write_headers=write_headers,
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "directory": self.directory,
+            "rotation": self.rotation,
+            "filename_prefix": self.filename_prefix,
+            "timestamp_format": self.timestamp_format,
+            "delimiter": self.delimiter,
+            "decimal": self.decimal,
+            "encoding": self.encoding,
+            "newline": self.newline,
+            "write_headers": self.write_headers,
+        }
+
+
+@dataclass
+class FTPSinkSettings:
+    enabled: bool = False
+    protocol: str = "ftp"  # ftp o sftp
+    host: Optional[str] = None
+    port: Optional[int] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+    remote_dir: str = "/"
+    local_dir: Optional[str] = None
+    rotation: str = "session"
+    upload_interval_s: Optional[float] = None
+    passive: bool = True
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> "FTPSinkSettings":
+        if not data:
+            return cls()
+        enabled = _as_bool(data.get("enabled"), False)
+        protocol = _as_str(data.get("protocol", "ftp"), "ftp.protocol") or "ftp"
+        protocol = protocol.lower()
+        if protocol not in {"ftp", "sftp"}:
+            raise ValueError("ftp.protocol debe ser 'ftp' o 'sftp'")
+        host_raw = data.get("host")
+        host = _as_str(host_raw, "ftp.host", optional=True) if host_raw is not None else None
+        port_raw = data.get("port")
+        port = _as_int(port_raw, "ftp.port") if port_raw not in (None, "") else None
+        username_raw = data.get("username")
+        username = _as_str(username_raw, "ftp.username", optional=True) if username_raw else None
+        password_raw = data.get("password")
+        password = _as_str(password_raw, "ftp.password", optional=True) if password_raw else None
+        remote_dir = _as_str(data.get("remote_dir", "/"), "ftp.remote_dir") or "/"
+        local_dir_raw = data.get("local_dir")
+        local_dir = (
+            _as_str(local_dir_raw, "ftp.local_dir", optional=True)
+            if local_dir_raw is not None
+            else None
+        )
+        rotation = _as_str(data.get("rotation", "session"), "ftp.rotation") or "session"
+        rotation = rotation.lower()
+        if rotation not in {"session", "periodic"}:
+            raise ValueError("ftp.rotation debe ser 'session' o 'periodic'")
+        upload_interval_raw = data.get("upload_interval_s")
+        if upload_interval_raw in (None, ""):
+            upload_interval = None
+        else:
+            upload_interval = _as_float(upload_interval_raw, "ftp.upload_interval_s")
+            if upload_interval <= 0:
+                raise ValueError("ftp.upload_interval_s debe ser > 0")
+        passive = _as_bool(data.get("passive"), True)
+        return cls(
+            enabled=enabled,
+            protocol=protocol,
+            host=host,
+            port=port,
+            username=username,
+            password=password,
+            remote_dir=remote_dir,
+            local_dir=local_dir,
+            rotation=rotation,
+            upload_interval_s=upload_interval,
+            passive=passive,
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "protocol": self.protocol,
+            "host": self.host,
+            "port": self.port,
+            "username": self.username,
+            "password": self.password,
+            "remote_dir": self.remote_dir,
+            "local_dir": self.local_dir,
+            "rotation": self.rotation,
+            "upload_interval_s": self.upload_interval_s,
+            "passive": self.passive,
+        }
+
+
+@dataclass
 class StorageSettings:
     driver: str
     url: str
@@ -255,6 +401,9 @@ class StorageSettings:
     queue_max_size: int = 1000
     verify_ssl: bool = True
     retry: RetrySettings = field(default_factory=RetrySettings)
+    sinks: List[str] = field(default_factory=list)
+    csv: CSVSinkSettings = field(default_factory=CSVSinkSettings)
+    ftp: FTPSinkSettings = field(default_factory=FTPSinkSettings)
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any]) -> "StorageSettings":
@@ -274,6 +423,20 @@ class StorageSettings:
             raise ValueError("queue_max_size debe ser >= 1")
         verify_ssl = _as_bool(data.get("verify_ssl"), True)
         retry = RetrySettings.from_mapping(data.get("retry"))
+        sinks_raw = data.get("sinks")
+        sinks: List[str]
+        if sinks_raw in (None, ""):
+            sinks = []
+        elif isinstance(sinks_raw, str):
+            sinks = [s.strip() for s in sinks_raw.split(",") if s.strip()]
+        elif isinstance(sinks_raw, Sequence):
+            sinks = [str(item).strip() for item in sinks_raw if str(item).strip()]
+        else:
+            raise ValueError("sinks debe ser una lista o cadena")
+        if not sinks:
+            sinks = [driver]
+        csv_settings = CSVSinkSettings.from_mapping(data.get("csv"))
+        ftp_settings = FTPSinkSettings.from_mapping(data.get("ftp"))
         return cls(
             driver=driver,
             url=url,
@@ -285,6 +448,9 @@ class StorageSettings:
             queue_max_size=queue_max_size,
             verify_ssl=verify_ssl,
             retry=retry,
+            sinks=sinks,
+            csv=csv_settings,
+            ftp=ftp_settings,
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -299,5 +465,8 @@ class StorageSettings:
             "queue_max_size": self.queue_max_size,
             "verify_ssl": self.verify_ssl,
             "retry": self.retry.to_dict(),
+            "sinks": list(self.sinks),
+            "csv": self.csv.to_dict(),
+            "ftp": self.ftp.to_dict(),
         }
 

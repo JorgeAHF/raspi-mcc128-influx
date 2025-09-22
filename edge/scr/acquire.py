@@ -10,40 +10,15 @@ if str(ROOT) not in sys.path:
 from edge.config.schema import StationConfig, StorageSettings
 from edge.config.store import load_station_config, load_storage_settings
 
-from acquisition import AcquisitionBlock, AcquisitionRunner, _consume_block_timestamps
-from calibrate import apply_calibration
-from sender import InfluxSender, to_line
+from acquisition import AcquisitionRunner, _consume_block_timestamps
+
+__all__ = [
+    "main",
+    "_consume_block_timestamps",
+]
 
 
 logger = logging.getLogger(__name__)
-
-
-def _build_block_handler(station_cfg: StationConfig, sender: InfluxSender):
-    pi = station_cfg.station_id
-    channels = station_cfg.channels
-    indices = [c.index for c in channels]
-    metadata = {
-        ch.index: (ch.name, ch.unit, ch.calibration.gain, ch.calibration.offset)
-        for ch in channels
-    }
-
-    def handle_block(block: AcquisitionBlock) -> None:
-        timestamps = block.timestamps_ns
-        for ch in indices:
-            sensor, unit, gain, offset = metadata[ch]
-            values = apply_calibration(block.values_by_channel.get(ch, []), gain, offset)
-            for ts_ns, mm in zip(timestamps, values):
-                line = to_line(
-                    "lvdt",
-                    tags={"pi": pi, "canal": ch, "sensor": sensor, "unidad": unit},
-                    fields={"valor": float(mm)},
-                    ts_ns=ts_ns,
-                )
-                sender.enqueue(line)
-
-    return handle_block
-
-
 def main(station: StationConfig | None = None, storage: StorageSettings | None = None):
     if not logging.getLogger().hasHandlers():
         logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -51,13 +26,10 @@ def main(station: StationConfig | None = None, storage: StorageSettings | None =
     station_cfg = station or load_station_config()
     storage_cfg = storage or load_storage_settings()
 
-    sender = InfluxSender(storage_cfg)
     try:
-        handler = _build_block_handler(station_cfg, sender)
         runner = AcquisitionRunner(
-            settings=station_cfg.acquisition,
-            channels=station_cfg.channels,
-            on_block=handler,
+            station=station_cfg,
+            storage=storage_cfg,
         )
         has_limits = (
             station_cfg.acquisition.duration_s is not None
@@ -67,8 +39,6 @@ def main(station: StationConfig | None = None, storage: StorageSettings | None =
         runner.run(mode=mode)
     except KeyboardInterrupt:
         logger.info("Adquisición interrumpida por el usuario.")
-    finally:
-        sender.close()
 
 
 if __name__ == "__main__":
