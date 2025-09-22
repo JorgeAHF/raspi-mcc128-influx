@@ -1,0 +1,36 @@
+{
+  "name": "mcc128-edge-webui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host",
+    "check": "tsc --noEmit",
+    "lint": "eslint src --ext ts,tsx",
+    "deploy": "npm run build && bash scripts/deploy.sh"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.45.0",
+    "chart.js": "^4.4.4",
+    "react": "^18.3.1",
+    "react-chartjs-2": "^5.2.0",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "@typescript-eslint/eslint-plugin": "^7.8.1",
+    "@typescript-eslint/parser": "^7.8.1",
+    "@vitejs/plugin-react": "^4.2.1",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react": "^7.34.1",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.0"
+  }
+}
