@@ -9,6 +9,10 @@ WorkingDirectory=/home/JJSI/projects/raspi-mcc128-influx/edge
 EnvironmentFile=-/home/JJSI/projects/raspi-mcc128-influx/edge/.env
 ExecStart=/home/JJSI/venv-daq/bin/python -m edge.webapi.main
 Restart=on-failure
+LogsDirectory=edge
+LogsDirectoryMode=0750
+StandardOutput=append:/var/log/edge/webapi.log
+StandardError=append:/var/log/edge/webapi.log
 
 [Install]
 WantedBy=multi-user.target

@@ -1,13 +1,18 @@
 [Unit]
-Description=Edge MCC128 acquisition
+Description=Edge MCC128 acquisition daemon
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 User=JJSI
 WorkingDirectory=/home/JJSI/projects/raspi-mcc128-influx/edge
+EnvironmentFile=-/home/JJSI/projects/raspi-mcc128-influx/edge/.env
 ExecStart=/home/JJSI/venv-daq/bin/python /home/JJSI/projects/raspi-mcc128-influx/edge/scr/acquire.py
 Restart=on-failure
+LogsDirectory=edge
+LogsDirectoryMode=0750
+StandardOutput=append:/var/log/edge/acquisition.log
+StandardError=append:/var/log/edge/acquisition.log
 
 [Install]
 WantedBy=multi-user.target
