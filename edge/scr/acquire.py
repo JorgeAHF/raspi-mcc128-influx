@@ -1,16 +1,9 @@
 import logging
-import sys
-from pathlib import Path
-
-# Ensure the repository root (edge parent) is importable when executed as script.
-ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
 
 from edge.config.schema import StationConfig, StorageSettings
 from edge.config.store import load_station_config, load_storage_settings
 
-from acquisition import AcquisitionRunner, _consume_block_timestamps
+from .acquisition import AcquisitionRunner, _consume_block_timestamps
 
 __all__ = [
     "main",
@@ -19,6 +12,8 @@ __all__ = [
 
 
 logger = logging.getLogger(__name__)
+
+
 def main(station: StationConfig | None = None, storage: StorageSettings | None = None):
     if not logging.getLogger().hasHandlers():
         logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")

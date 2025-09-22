@@ -9,9 +9,9 @@ from typing import Callable, Dict, List, Optional, Protocol, Sequence, runtime_c
 
 from edge.config.schema import StationConfig, StorageSettings
 
-from calibrate import apply_calibration
-from mcc_reader import open_mcc128, read_block, start_scan
-from sinks import Sample, SampleSink, build_sinks
+from .calibrate import apply_calibration
+from .mcc_reader import open_mcc128, read_block, start_scan
+from .sinks import Sample, SampleSink, build_sinks
 
 logger = logging.getLogger(__name__)
 

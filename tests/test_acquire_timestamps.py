@@ -1,11 +1,4 @@
-import sys
-from pathlib import Path
-
-
-# Allow importing scripts from the edge/scr directory.
-sys.path.append(str(Path(__file__).resolve().parents[1] / "edge" / "scr"))
-
-from acquire import _consume_block_timestamps  # type: ignore  # noqa: E402
+from edge.scr.acquire import _consume_block_timestamps  # type: ignore  # noqa: E402
 
 
 def test_consecutive_blocks_preserve_ts_step():

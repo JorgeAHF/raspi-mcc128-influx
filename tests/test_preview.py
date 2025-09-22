@@ -1,15 +1,7 @@
 import asyncio
-from pathlib import Path
-import sys
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
-SCR_PATH = ROOT / "edge" / "scr"
-if str(SCR_PATH) not in sys.path:
-    sys.path.append(str(SCR_PATH))
-
-from acquisition import AcquisitionRunner, CalibratedBlock, CalibratedChannelBlock  # type: ignore  # noqa: E402
 from edge.config.schema import (  # type: ignore  # noqa: E402
     AcquisitionSettings,
     Calibration,
@@ -17,7 +9,13 @@ from edge.config.schema import (  # type: ignore  # noqa: E402
     StationConfig,
     StorageSettings,
 )
-from preview import PreviewOptions, stream_preview  # type: ignore  # noqa: E402
+from edge.scr import acquisition as acquisition_module  # type: ignore  # noqa: E402
+from edge.scr.acquisition import (  # type: ignore  # noqa: E402
+    AcquisitionRunner,
+    CalibratedBlock,
+    CalibratedChannelBlock,
+)
+from edge.scr.preview import PreviewOptions, stream_preview  # type: ignore  # noqa: E402
 
 
 def _make_station(total_samples: int = 4) -> StationConfig:
@@ -53,13 +51,13 @@ def test_acquisition_runner_broadcasts_calibrated_blocks(monkeypatch):
     queue: "asyncio.Queue[CalibratedBlock | None]" = asyncio.Queue()
 
     fake_board = object()
-    monkeypatch.setattr("acquisition.open_mcc128", lambda: fake_board)
+    monkeypatch.setattr(acquisition_module, "open_mcc128", lambda: fake_board)
 
     def fake_start_scan(board, channels, fs_hz, channel_ranges=None, block_samples=None):
         assert board is fake_board
         return 0b1, block_samples or station.acquisition.block_size
 
-    monkeypatch.setattr("acquisition.start_scan", fake_start_scan)
+    monkeypatch.setattr(acquisition_module, "start_scan", fake_start_scan)
 
     blocks = [
         {0: [0.1, 0.2]},
@@ -71,7 +69,7 @@ def test_acquisition_runner_broadcasts_calibrated_blocks(monkeypatch):
             return blocks.pop(0)
         return {ch: [] for ch in channel_indices}
 
-    monkeypatch.setattr("acquisition.read_block", fake_read_block)
+    monkeypatch.setattr(acquisition_module, "read_block", fake_read_block)
 
     sink_calls: list[str] = []
 

@@ -8,13 +8,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-# Allow importing scripts from the edge/scr directory.
-SCR_PATH = ROOT / "edge" / "scr"
-if str(SCR_PATH) not in sys.path:
-    sys.path.append(str(SCR_PATH))
-
 from edge.config import load_station_config  # type: ignore  # noqa: E402
-from calibrate import apply_calibration  # type: ignore  # noqa: E402
+from edge.scr.calibrate import apply_calibration  # type: ignore  # noqa: E402
 
 
 @pytest.mark.parametrize(

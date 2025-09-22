@@ -9,7 +9,7 @@ from typing import AsyncIterator, Iterable, List, Optional, Sequence
 
 from edge.config.schema import ChannelConfig, StationConfig
 
-from acquisition import CalibratedBlock, CalibratedChannelBlock
+from .acquisition import CalibratedBlock, CalibratedChannelBlock
 
 logger = logging.getLogger(__name__)
 
