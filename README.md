@@ -161,25 +161,37 @@ python scr/acquire.py
 - **Limitaciones:** el modo test no inicializa sinks pesados (Influx/CSV/FTP) para evitar contención con almacenamiento concurrente. Si necesita almacenar y previsualizar simultáneamente, ejecute instancias separadas o utilice colas con backpressure controlado.【F:edge/scr/acquisition.py†L134-L150】
 - Métricas en logs: se informa cada bloque emitido (`DEBUG`) y un resumen al finalizar (`INFO`) con bloques y muestras entregadas, útil para monitorear latencias y tamaño de cola.【F:edge/scr/acquisition.py†L211-L253】
 
-## Instalación del servicio `edge.service`
-1. Ajuste rutas, usuario y entorno virtual en `edge/service/edge.service` según su sistema (edite `User`, `WorkingDirectory`, `EnvironmentFile` y `ExecStart`).【F:edge/service/edge.service†L1-L13】
-2. Copie el archivo a systemd y recargue la configuración:
+## Servicios systemd (adquisición y API)
+1. Ajuste rutas, usuario y entorno virtual en `edge/service/edge.service` y `edge/service/webapi.service` según su sistema (valores por defecto pensados para `~/projects/raspi-mcc128-influx` y `~/venv-daq`).【F:edge/service/edge.service†L1-L16】【F:edge/service/webapi.service†L1-L16】
+2. Copie los archivos a systemd y recargue la configuración:
    ```bash
-   sudo cp edge/service/edge.service /etc/systemd/system/edge.service
+   sudo cp edge/service/edge.service /etc/systemd/system/acquisition.service
+   sudo cp edge/service/webapi.service /etc/systemd/system/webapi.service
    sudo systemctl daemon-reload
    ```
-3. Revise que las rutas apunten al repositorio y al entorno `~/venv-daq`.
+3. Revise que ambos units apunten al repositorio correcto, al usuario que ejecutará los procesos y al entorno virtual de Python.
 
-## Habilitar y supervisar el servicio
+Las unidades escriben simultáneamente en journald y en archivos rotables dentro de `/var/log/edge` mediante `LogsDirectory=` y `StandardOutput=append`. Cree la carpeta con permisos restringidos antes de habilitar los servicios:
 ```bash
-sudo systemctl enable --now edge.service
-sudo systemctl status edge.service --no-pager
+sudo install -d -m 0750 -o JJSI -g JJSI /var/log/edge
+```
+
+Para rotar los archivos `acquisition.log` y `webapi.log` copie `edge/service/logrotate-edge.conf` a `/etc/logrotate.d/edge` y ajuste el usuario/grupo si difiere de `JJSI`. El perfil conserva siete días de historial comprimido.【F:edge/service/logrotate-edge.conf†L1-L9】
+
+## Habilitar y supervisar los servicios
+```bash
+sudo systemctl enable --now acquisition.service
+sudo systemctl enable --now webapi.service
+sudo systemctl status acquisition.service --no-pager
+sudo systemctl status webapi.service --no-pager
 ```
 Para aplicar cambios futuros (`storage.yaml`, `sensors.yaml` o código):
 ```bash
-sudo systemctl daemon-reload      # si cambió el unit file
-sudo systemctl restart edge.service
-journalctl -u edge.service -f     # ver logs en vivo
+sudo systemctl daemon-reload        # si cambió algún unit file
+sudo systemctl restart acquisition.service
+sudo systemctl restart webapi.service
+journalctl -fu acquisition.service  # ver logs de adquisición en vivo
+journalctl -fu webapi.service       # ver logs de la API
 ```
 
 ## Validar conectividad desde la Pi
@@ -196,12 +208,19 @@ PY
 Debe devolver `{"status": "pass"}`. Si falla, verifique red/firewall y que la hora del sistema sea correcta (`timedatectl status`).
 
 ## Uso de `deploy.sh`
-El script automatiza la actualización del código y la reinstalación de dependencias:
+El script automatiza la actualización del código, la instalación de dependencias de Python/Node, la compilación de la SPA y la creación del directorio de logs antes de reiniciar los servicios de backend:
 ```bash
 cd ~/projects/raspi-mcc128-influx
 bash deploy.sh
 ```
-Pasos internos: `git fetch/reset` a `origin/main`, activa `~/venv-daq`, instala `requirements.txt` y reinicia `edge.service`. Edite el script si su ruta o rama difiere.【F:deploy.sh†L1-L19】
+Variables opcionales permiten personalizar usuario, venv, rutas de logs y nombres de services (`EDGE_SERVICE_USER`, `EDGE_PYTHON_VENV`, `EDGE_ACQUISITION_SERVICE`, `EDGE_WEBAPI_SERVICE`, `EDGE_LOG_DIR`). Internamente ejecuta `git fetch/reset` a `origin/main`, activa el entorno, corre `pip install -r requirements.txt`, lanza `npm install && npm run build` dentro de `edge/webui` (si `npm` está disponible) y reinicia los servicios configurados tras `systemctl daemon-reload`.【F:deploy.sh†L1-L46】
+
+## Secuencia de arranque y acceso a la UI
+1. Configure `storage.yaml` y `sensors.yaml` como se detalla arriba.
+2. Despliegue la última versión con `deploy.sh` (o instale manualmente dependencias y compile la SPA).
+3. Habilite `acquisition.service` y `webapi.service` para que inicien automáticamente tras cada reboot.
+4. Publique los artefactos de `edge/webui/dist` con su servidor web (por defecto `edge/webui/scripts/deploy.sh` los copia a `/var/www/edge-webui` y recarga `nginx`).【F:edge/webui/scripts/deploy.sh†L1-L24】
+5. Acceda a la UI desde un navegador apuntando a la URL que sirva la SPA (p. ej. `http://<pi>/`) y confirme que las solicitudes al backend alcanzan la API FastAPI en `http://<pi>:8000` (puerto configurable vía `EDGE_WEBAPI_PORT`).【F:edge/webapi/main.py†L11-L23】
 
 ## Solución de problemas comunes
 - **InfluxDB responde 400 (Bad Request)**: revise que el bucket exista y que las etiquetas/campos no contengan caracteres no válidos. Verifique que el host no fuerce HTTPS cuando usa HTTP.【F:edge/scr/sender.py†L46-L74】
