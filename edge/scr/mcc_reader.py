@@ -82,7 +82,7 @@ def start_scan(
     ch_mask = 0
     for ch in channels:
         ch_mask |= 1 << ch
-    board.a_in_mode_write(AnalogInputMode.DIFFERENTIAL)
+    board.a_in_mode_write(AnalogInputMode.DIFF)
     board.a_in_range_write(resolve_input_range(channel_ranges))
     board.a_in_scan_start(
         channel_mask=ch_mask,
