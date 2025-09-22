@@ -1,0 +1,14 @@
+[Unit]
+Description=Edge MCC128 Web API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=JJSI
+WorkingDirectory=/home/JJSI/projects/raspi-mcc128-influx/edge
+EnvironmentFile=-/home/JJSI/projects/raspi-mcc128-influx/edge/.env
+ExecStart=/home/JJSI/venv-daq/bin/python -m edge.webapi.main
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
