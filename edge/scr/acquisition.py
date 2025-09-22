@@ -7,9 +7,11 @@ import logging
 from time import time_ns
 from typing import Callable, Dict, List, Optional, Sequence
 
-from edge.config.schema import AcquisitionSettings, ChannelConfig
+from edge.config.schema import StationConfig, StorageSettings
 
+from calibrate import apply_calibration
 from mcc_reader import open_mcc128, read_block, start_scan
+from sinks import Sample, SampleSink, build_sinks
 
 logger = logging.getLogger(__name__)
 
@@ -31,21 +33,22 @@ def _consume_block_timestamps(next_ts_ns: int, block_len: int, ts_step: int) -> 
 
 
 class AcquisitionRunner:
-    """Coordinate MCC128 scans and deliver blocks to the provided callback."""
+    """Coordinate MCC128 scans and deliver samples to the configured sinks."""
 
     def __init__(
         self,
-        settings: AcquisitionSettings,
-        channels: Sequence[ChannelConfig],
+        station: StationConfig,
+        storage: StorageSettings,
         *,
-        on_block: Callable[[AcquisitionBlock], None],
+        sink_factory: Callable[[StorageSettings], Sequence[SampleSink]] = build_sinks,
     ) -> None:
-        if not callable(on_block):  # pragma: no cover - defensive
-            raise TypeError("on_block must be callable")
-        self.settings = settings
-        self.channels = list(channels)
-        self._on_block = on_block
+        self.station = station
+        self.settings = station.acquisition
+        self.channels = list(station.channels)
+        self.storage = storage
+        self._sink_factory = sink_factory
         self._stop_requested = False
+        self._active_sinks: Sequence[SampleSink] = ()
 
     def request_stop(self) -> None:
         """Signal the runner to stop after completing the current iteration."""
@@ -60,6 +63,7 @@ class AcquisitionRunner:
 
         board = None
         ch_mask = 0
+        self._active_sinks = self._initialize_sinks()
         try:
             board = open_mcc128()
             channel_indices = [ch.index for ch in self.channels]
@@ -121,7 +125,7 @@ class AcquisitionRunner:
                     values_by_channel=raw,
                     captured_at_ns=block_captured_ns,
                 )
-                self._on_block(block)
+                self._handle_block(block)
 
                 expected_next_ts_ns = block_captured_ns + ts_step
                 drift_ns = expected_next_ts_ns - candidate_next_ts_ns
@@ -157,6 +161,7 @@ class AcquisitionRunner:
                     logger.info("Acquisition duration exhausted after delivering block.")
                     break
         finally:
+            self._shutdown_sinks()
             if board is not None:
                 stop_scan = getattr(board, "a_in_scan_stop", None)
                 if callable(stop_scan):
@@ -164,3 +169,65 @@ class AcquisitionRunner:
                 cleanup_scan = getattr(board, "a_in_scan_cleanup", None)
                 if callable(cleanup_scan):
                     cleanup_scan()
+
+    # Internal helpers --------------------------------------------------------
+    def _initialize_sinks(self) -> Sequence[SampleSink]:
+        sinks = list(self._sink_factory(self.storage))
+        if not sinks:
+            logger.warning("No hay sinks configurados; las muestras no se almacenarán.")
+            return []
+        ready: List[SampleSink] = []
+        for sink in sinks:
+            try:
+                sink.open()
+            except Exception:  # pragma: no cover - mantenimiento
+                logger.exception("Error al inicializar sink %r", sink)
+                continue
+            ready.append(sink)
+        if not ready:
+            logger.error("No fue posible inicializar ningún sink.")
+        return ready
+
+    def _shutdown_sinks(self) -> None:
+        for sink in self._active_sinks:
+            try:
+                sink.close()
+            except Exception:  # pragma: no cover - mantenimiento
+                logger.exception("Error al cerrar sink %r", sink)
+        self._active_sinks = ()
+
+    def _handle_block(self, block: AcquisitionBlock) -> None:
+        if not self._active_sinks:
+            return
+        station_id = self.station.station_id
+        for channel in self.channels:
+            values = block.values_by_channel.get(channel.index, [])
+            calibrated = apply_calibration(values, channel.calibration.gain, channel.calibration.offset)
+            for ts_ns, value in zip(block.timestamps_ns, calibrated):
+                tags = {
+                    "pi": station_id,
+                    "sensor": channel.name,
+                    "unidad": channel.unit,
+                    "canal": channel.index,
+                }
+                metadata = {
+                    "measurement": "lvdt",
+                    "tags": tags,
+                    "station_id": station_id,
+                    "sensor_name": channel.name,
+                    "unit": channel.unit,
+                }
+                sample = Sample(
+                    channel=channel.index,
+                    timestamp_ns=ts_ns,
+                    calibrated_values={"valor": float(value)},
+                    metadata=metadata,
+                )
+                self._dispatch_sample(sample)
+
+    def _dispatch_sample(self, sample: Sample) -> None:
+        for sink in self._active_sinks:
+            try:
+                sink.handle_sample(sample)
+            except Exception:  # pragma: no cover - registro de errores
+                logger.exception("Sink %r rechazó la muestra", sink)
