@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import json
+import shutil
 import threading
 import time
 from pathlib import Path
-import shutil
 
 import pytest
+
+pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
 
 from edge.config import store as config_store
@@ -100,11 +103,70 @@ def test_update_station_config_validation(api_client):
     assert response.status_code == 422
 
 
+def test_update_station_config_roundtrip(api_client, temp_config_dir):
+    payload = {
+        "station_id": "station-99",
+        "acquisition": {
+            "sample_rate_hz": 25,
+            "block_size": 5,
+            "duration_s": None,
+            "total_samples": None,
+            "drift_detection": {"correction_threshold_ns": None},
+        },
+        "channels": [
+            {
+                "index": 0,
+                "name": "Test",
+                "unit": "mm",
+                "voltage_range": 5.0,
+                "calibration": {"gain": 1, "offset": 0},
+            }
+        ],
+    }
+
+    response = api_client.put("/config/mcc128", json=payload)
+    assert response.status_code == 200
+    assert response.json()["station_id"] == "station-99"
+
+    stored = json.loads((temp_config_dir / "sensors.yaml").read_text())
+    assert stored["station_id"] == "station-99"
+
+    roundtrip = api_client.get("/config/mcc128")
+    assert roundtrip.status_code == 200
+    assert roundtrip.json()["station_id"] == "station-99"
+
+
 def test_update_influx_partial(api_client):
     response = api_client.put("/config/influx", json={"token": "new-token"})
     assert response.status_code == 200
     data = response.json()
     assert data["token"] == "new-token"
+
+
+def test_update_influx_rejects_unknown_fields(api_client):
+    response = api_client.put("/config/influx", json={"token": "value", "invalid": True})
+    assert response.status_code == 400
+    assert "Campos no soportados" in response.json()["detail"]
+
+
+def test_storage_settings_crud(api_client, temp_config_dir):
+    payload = {
+        "driver": "influxdb_v2",
+        "url": "http://localhost:8086",
+        "org": "demo",
+        "bucket": "test",
+        "token": "abc",
+        "retry": {"max_attempts": 2},
+    }
+
+    response = api_client.put("/config/storage", json=payload)
+    assert response.status_code == 200
+    stored = json.loads((temp_config_dir / "storage.yaml").read_text())
+    assert stored["bucket"] == "test"
+
+    fetched = api_client.get("/config/storage")
+    assert fetched.status_code == 200
+    assert fetched.json()["bucket"] == "test"
 
 
 def test_acquisition_lifecycle_with_preview(api_client, stubbed_session_manager):
@@ -136,4 +198,14 @@ def test_acquisition_lifecycle_with_preview(api_client, stubbed_session_manager)
         assert summary["mode"] == "continuous"
     else:
         assert stop.status_code == 409
+
+
+def test_acquisition_timed_without_preview(api_client, stubbed_session_manager):
+    start = api_client.post("/acquisition/start", json={"mode": "timed", "preview": False})
+    assert start.status_code == 202
+    body = start.json()
+    assert body["preview"] is False
+
+    stop = api_client.post("/acquisition/stop")
+    assert stop.status_code == 200
 
