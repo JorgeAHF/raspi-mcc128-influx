@@ -6,6 +6,7 @@ Sistema de adquisición con Raspberry Pi 5, hat MCC 128 y envío a InfluxDB 2.x.
 - Hat MCC 128 correctamente montado y cableado en modo diferencial.
 - Python 3.10 o superior con `python3-venv`, `pip`, `git` y `curl` instalados.
 - InfluxDB 2.x accesible desde la red de la Pi (URL, organización, bucket y token válidos).
+- Node.js 18 o superior con `npm` para construir/probar la interfaz web. Las pruebas E2E requieren los navegadores de Playwright (`npx playwright install --with-deps` la primera vez).
 - Permisos de `sudo` para instalar dependencias del sistema y registrar servicios systemd.
 
 ## Crear el entorno virtual `~/venv-daq`
@@ -160,6 +161,28 @@ python scr/acquire.py
 - Limite el `downsample` y la duración (`max_duration_s`) según lo solicitado por el cliente; se reutilizan los mismos índices de canal definidos en `sensors.yaml`, y se validan contra la configuración vigente.【F:edge/scr/preview.py†L26-L75】【F:edge/config/sensors.yaml†L1-L18】
 - **Limitaciones:** el modo test no inicializa sinks pesados (Influx/CSV/FTP) para evitar contención con almacenamiento concurrente. Si necesita almacenar y previsualizar simultáneamente, ejecute instancias separadas o utilice colas con backpressure controlado.【F:edge/scr/acquisition.py†L134-L150】
 - Métricas en logs: se informa cada bloque emitido (`DEBUG`) y un resumen al finalizar (`INFO`) con bloques y muestras entregadas, útil para monitorear latencias y tamaño de cola.【F:edge/scr/acquisition.py†L211-L253】
+
+## Interfaz web (SPA React)
+- Instale las dependencias y prepare Playwright (sólo la primera vez):
+  ```bash
+  cd edge/webui
+  npm install
+  npx playwright install --with-deps chromium
+  ```
+- Ejecute el entorno de desarrollo (Vite expone la SPA en http://127.0.0.1:5173 por defecto):
+  ```bash
+  npm run dev
+  ```
+- La SPA solicita el token de la API (Bearer) al iniciar. Introduzca un valor válido en el administrador de tokens (es almacenado en `localStorage`) y utilice los formularios “Configuración MCC128” y “Almacenamiento” para editar `sensors.yaml` y `storage.yaml` desde el navegador.【F:edge/webui/src/App.tsx†L14-L122】【F:edge/webui/src/pages/StationConfigView.tsx†L1-L120】【F:edge/webui/src/pages/StorageSettingsView.tsx†L154-L219】
+- Para validar que los formularios y la vista previa funcionan sin hardware real ejecute las pruebas Playwright:
+  ```bash
+  npm run test:e2e
+  ```
+  El test levanta `npm run dev` temporalmente, intercepta las peticiones HTTP y verifica que los formularios envían la nueva configuración y que el gráfico de vista previa representa muestras simuladas.【F:edge/webui/tests/e2e.spec.ts†L1-L129】
+- Seguridad recomendada:
+  - Limite el acceso a la SPA tras un reverse proxy con TLS y autenticación (p. ej. Basic Auth + token Bearer).
+  - Rote periódicamente el token de la API y utilice usuarios de sólo lectura si entrega acceso a terceros.【F:edge/webui/src/App.tsx†L72-L122】
+  - El token se almacena en `localStorage`; limpie el navegador al terminar sesiones compartidas y evite ejecutarlo en quioscos no gestionados.
 
 ## Servicios systemd (adquisición y API)
 1. Ajuste rutas, usuario y entorno virtual en `edge/service/edge.service` y `edge/service/webapi.service` según su sistema (valores por defecto pensados para `~/projects/raspi-mcc128-influx` y `~/venv-daq`).【F:edge/service/edge.service†L1-L16】【F:edge/service/webapi.service†L1-L16】
