@@ -6,6 +6,8 @@ import {
   StationConfig,
   StorageSettings,
   StopResponse,
+  SyncTimeResponse,
+  TimeStatus,
 } from "./types";
 
 export interface ApiClientOptions {
@@ -126,6 +128,10 @@ export class ApiClient {
     return this.request<SessionStatusResponse>("/acquisition/session");
   }
 
+  async getTimeStatus(): Promise<TimeStatus> {
+    return this.request<TimeStatus>("/system/time");
+  }
+
   async startAcquisition(payload: StartSessionRequest): Promise<SessionStatusResponse["session"]> {
     return this.request("/acquisition/start", {
       method: "POST",
@@ -135,6 +141,12 @@ export class ApiClient {
 
   async stopAcquisition(): Promise<StopResponse> {
     return this.request<StopResponse>("/acquisition/stop", {
+      method: "POST",
+    });
+  }
+
+  async syncTime(): Promise<SyncTimeResponse> {
+    return this.request<SyncTimeResponse>("/system/time/sync", {
       method: "POST",
     });
   }
