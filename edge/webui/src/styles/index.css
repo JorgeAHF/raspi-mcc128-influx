@@ -199,6 +199,96 @@ legend {
   min-width: 140px;
 }
 
+.influx-status-card {
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 14px;
+  padding: 1rem;
+  margin-bottom: 1.25rem;
+  background: rgba(15, 23, 42, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.influx-status-card.status-ok {
+  border-color: rgba(34, 197, 94, 0.4);
+}
+
+.influx-status-card.status-warning {
+  border-color: rgba(234, 179, 8, 0.4);
+}
+
+.influx-status-card.status-error {
+  border-color: rgba(248, 113, 113, 0.45);
+}
+
+.influx-status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.status-pill.ok {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+}
+
+.status-pill.warning {
+  background: rgba(234, 179, 8, 0.18);
+  color: #facc15;
+}
+
+.status-pill.error {
+  background: rgba(248, 113, 113, 0.22);
+  color: #f87171;
+}
+
+.status-pill.idle {
+  background: rgba(148, 163, 184, 0.2);
+  color: #cbd5f5;
+}
+
+.status-message {
+  margin: 0;
+}
+
+.influx-status-details {
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.influx-status-details div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.influx-status-details dt {
+  font-weight: 600;
+  color: #cbd5f5;
+}
+
+.influx-status-details dd {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #e2e8f0;
+}
+
 .tabs {
   display: flex;
   flex-direction: column;

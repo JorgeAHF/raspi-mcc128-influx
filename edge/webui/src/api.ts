@@ -9,6 +9,7 @@ import {
   StopResponse,
   SyncTimeResponse,
   TimeStatus,
+  InfluxConnectionStatus,
 } from "./types";
 
 export interface ApiClientOptions {
@@ -141,6 +142,10 @@ export class ApiClient {
     const query = params.toString();
     const path = `/logs${query ? `?${query}` : ""}`;
     return this.request<LogsResponse>(path);
+  }
+
+  async getInfluxStatus(): Promise<InfluxConnectionStatus> {
+    return this.request<InfluxConnectionStatus>("/config/influx/status");
   }
 
   async startAcquisition(payload: StartSessionRequest): Promise<SessionStatusResponse["session"]> {

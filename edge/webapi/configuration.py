@@ -3,7 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 from typing import Any, Dict, Mapping
+
+from time import perf_counter
+import time
+
+import requests
 
 import anyio
 from fastapi import APIRouter, Body, Depends, HTTPException, status
@@ -55,6 +61,153 @@ async def _load_station() -> StationConfig:
 
 async def _load_storage() -> StorageSettings:
     return await anyio.to_thread.run_sync(load_storage_settings)
+
+
+def _shorten(text: str, limit: int = 160) -> str:
+    """Normalize whitespace and truncate long payloads for display."""
+
+    compact = " ".join(text.split())
+    if len(compact) > limit:
+        return f"{compact[: limit - 1]}…"
+    return compact
+
+
+def _check_influx_health(session: requests.Session, settings: StorageSettings) -> Dict[str, Any]:
+    url = f"{settings.url.rstrip('/')}/health"
+    headers: Dict[str, str] = {}
+    if settings.token:
+        headers["Authorization"] = f"Token {settings.token}"
+
+    start = perf_counter()
+    try:
+        response = session.get(url, headers=headers, timeout=settings.timeout_s)
+    except requests.RequestException as exc:  # pragma: no cover - exercised via tests
+        return {
+            "ok": False,
+            "message": f"No se pudo conectar al endpoint /health: {exc}",
+            "http_status": None,
+            "latency_ms": None,
+        }
+
+    latency_ms = (perf_counter() - start) * 1000
+    content_type = response.headers.get("content-type", "")
+
+    if response.ok:
+        status_text = None
+        if "application/json" in content_type:
+            try:
+                payload = response.json()
+            except ValueError:
+                payload = None
+            if isinstance(payload, dict):
+                raw = payload.get("status") or payload.get("message")
+                if isinstance(raw, str):
+                    status_text = raw
+        message = status_text or "El servicio de salud respondió correctamente."
+        return {
+            "ok": True,
+            "message": message,
+            "http_status": response.status_code,
+            "latency_ms": round(latency_ms, 2),
+        }
+
+    body_text = response.text or ""
+    message = _shorten(body_text or f"Influx devolvió {response.status_code}.")
+    return {
+        "ok": False,
+        "message": message,
+        "http_status": response.status_code,
+        "latency_ms": round(latency_ms, 2),
+    }
+
+
+def _check_influx_write(session: requests.Session, settings: StorageSettings) -> Dict[str, Any]:
+    params = [
+        ("org", settings.org),
+        ("bucket", settings.bucket),
+        ("precision", "ns"),
+        ("dryRun", "true"),
+        ("dryrun", "true"),
+    ]
+    url = f"{settings.url.rstrip('/')}/api/v2/write"
+    headers = {
+        "Authorization": f"Token {settings.token}",
+        "Content-Type": "text/plain; charset=utf-8",
+        "User-Agent": "mcc128-edge/connection-check",
+    }
+    probe_line = f"edge_connection_check status=1i {time.time_ns()}"
+
+    start = perf_counter()
+    try:
+        response = session.post(
+            url,
+            params=params,
+            headers=headers,
+            data=probe_line.encode("utf-8"),
+            timeout=settings.timeout_s,
+        )
+    except requests.RequestException as exc:  # pragma: no cover - exercised via tests
+        return {
+            "ok": False,
+            "message": f"No se pudo enviar la solicitud de prueba: {exc}",
+            "http_status": None,
+            "latency_ms": None,
+        }
+
+    latency_ms = (perf_counter() - start) * 1000
+    body_text = response.text or ""
+
+    if response.status_code < 300:
+        return {
+            "ok": True,
+            "message": "Influx aceptó la escritura de validación (dry run).",
+            "http_status": response.status_code,
+            "latency_ms": round(latency_ms, 2),
+        }
+
+    message = _shorten(body_text or f"Influx devolvió {response.status_code}.")
+    return {
+        "ok": False,
+        "message": message,
+        "http_status": response.status_code,
+        "latency_ms": round(latency_ms, 2),
+    }
+
+
+def _check_influx_status(settings: StorageSettings) -> Dict[str, Any]:
+    session = requests.Session()
+    session.verify = settings.verify_ssl
+    try:
+        health = _check_influx_health(session, settings)
+        if health["ok"]:
+            write = _check_influx_write(session, settings)
+        else:
+            write = {
+                "ok": False,
+                "message": "Se omitió la prueba de escritura porque el chequeo de salud falló.",
+                "http_status": None,
+                "latency_ms": None,
+            }
+    finally:
+        session.close()
+
+    if health["ok"] and write["ok"]:
+        status = "ok"
+        message = "Conexión verificada. Influx está listo para recibir datos."
+    elif health["ok"]:
+        status = "warning"
+        message = "Influx respondió al chequeo de salud pero rechazó la prueba de escritura."
+    else:
+        status = "error"
+        message = "No se pudo contactar al servicio de Influx."
+
+    return {
+        "status": status,
+        "message": message,
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "health": health,
+        "write": write,
+    }
 
 
 @router.get("/mcc128")
@@ -145,4 +298,12 @@ async def update_influx_credentials(
             )
         await anyio.to_thread.run_sync(save_storage_settings, candidate)
         return _serialize_influx(candidate)
+
+
+@router.get("/influx/status")
+async def get_influx_status(_: None = Depends(require_token)) -> Dict[str, Any]:
+    """Ejecuta una verificación de salud y escritura contra InfluxDB."""
+
+    settings = await _load_storage()
+    return await anyio.to_thread.run_sync(_check_influx_status, settings)
 
