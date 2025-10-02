@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import threading
 import time
 from pathlib import Path
 
 import pytest
+import responses
 
 pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
@@ -240,4 +242,43 @@ def test_logs_endpoint_filters_categories(api_client, tmp_path, monkeypatch):
     assert "Timeout leyendo bloque" in acquisition_messages
     assert "Sesión abortada" in acquisition_messages
     assert storage_messages == ["Influx write failed"]
+
+
+@responses.activate
+def test_influx_status_endpoint_reports_success(api_client):
+    responses.add(
+        responses.GET,
+        "http://localhost:8086/health",
+        json={"status": "pass"},
+        status=200,
+    )
+    responses.add(
+        responses.POST,
+        re.compile(r"http://localhost:8086/api/v2/write.*"),
+        status=204,
+    )
+
+    response = api_client.get("/config/influx/status")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "ok"
+    assert payload["health"]["ok"] is True
+    assert payload["write"]["ok"] is True
+    assert "checked_at" in payload
+
+
+@responses.activate
+def test_influx_status_endpoint_handles_health_error(api_client):
+    responses.add(
+        responses.GET,
+        "http://localhost:8086/health",
+        body=responses.ConnectionError("boom"),
+    )
+
+    response = api_client.get("/config/influx/status")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "error"
+    assert payload["health"]["ok"] is False
+    assert payload["write"]["ok"] is False
 

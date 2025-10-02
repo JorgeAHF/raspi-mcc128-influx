@@ -1,7 +1,7 @@
 import { ChangeEvent } from "react";
 import { SectionCard } from "../components/SectionCard";
 import { SinkToggle } from "../components/SinkToggle";
-import { StorageSettings } from "../types";
+import { InfluxConnectionStatus, InfluxCheckDetail, StorageSettings } from "../types";
 
 interface StorageSettingsViewProps {
   settings: StorageSettings | null;
@@ -11,6 +11,9 @@ interface StorageSettingsViewProps {
   dirty: boolean;
   saving: boolean;
   loading: boolean;
+  influxStatus: InfluxConnectionStatus | null;
+  checkingInflux: boolean;
+  onCheckInflux: () => void;
 }
 
 export function StorageSettingsView({
@@ -21,6 +24,9 @@ export function StorageSettingsView({
   dirty,
   saving,
   loading,
+  influxStatus,
+  checkingInflux,
+  onCheckInflux,
 }: StorageSettingsViewProps) {
   const handleChange = (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     if (!settings) return;
@@ -150,6 +156,37 @@ export function StorageSettingsView({
     return Array.from(set);
   };
 
+  const describeDetail = (detail: InfluxCheckDetail) => {
+    const statusLabel = detail.ok ? "OK" : "Error";
+    const extra: string[] = [];
+    if (detail.http_status !== null) {
+      extra.push(`HTTP ${detail.http_status}`);
+    }
+    if (detail.latency_ms !== null) {
+      extra.push(`${detail.latency_ms.toFixed(0)} ms`);
+    }
+    const suffix = extra.length > 0 ? ` (${extra.join(" · ")})` : "";
+    return `${statusLabel} — ${detail.message}${suffix}`;
+  };
+
+  const statusLabel = () => {
+    if (checkingInflux) {
+      return "Verificando…";
+    }
+    if (!influxStatus) {
+      return "Sin verificar";
+    }
+    if (influxStatus.status === "ok") {
+      return "Conectado";
+    }
+    if (influxStatus.status === "warning") {
+      return "Advertencia";
+    }
+    return "Sin conexión";
+  };
+
+  const lastChecked = influxStatus ? new Date(influxStatus.checked_at).toLocaleString() : null;
+
   return (
     <SectionCard
       id="storage"
@@ -166,6 +203,39 @@ export function StorageSettingsView({
         </div>
       }
     >
+      <div className={`influx-status-card ${influxStatus ? `status-${influxStatus.status}` : "status-idle"}`}>
+        <div className="influx-status-header">
+          <span className={`status-pill ${influxStatus ? influxStatus.status : "idle"}`}>{statusLabel()}</span>
+          <button
+            type="button"
+            className="secondary"
+            onClick={onCheckInflux}
+            disabled={checkingInflux || loading || saving}
+          >
+            {checkingInflux ? "Verificando…" : "Reintentar"}
+          </button>
+        </div>
+        <p className="status-message">
+          {checkingInflux
+            ? "Ejecutando verificación contra Influx…"
+            : influxStatus?.message ?? "Aún no se ha comprobado la conectividad con Influx."}
+        </p>
+        {influxStatus && (
+          <dl className="influx-status-details">
+            <div>
+              <dt>Salud del servicio</dt>
+              <dd>{describeDetail(influxStatus.health)}</dd>
+            </div>
+            <div>
+              <dt>Prueba de escritura</dt>
+              <dd>{describeDetail(influxStatus.write)}</dd>
+            </div>
+          </dl>
+        )}
+        {lastChecked && !checkingInflux && (
+          <p className="muted">Última verificación: {lastChecked}</p>
+        )}
+      </div>
       {!settings ? (
         <p>{loading ? "Cargando configuración…" : "No hay configuración de almacenamiento."}</p>
       ) : (

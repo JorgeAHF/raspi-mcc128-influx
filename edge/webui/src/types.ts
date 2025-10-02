@@ -156,3 +156,18 @@ export interface LogsResponse {
   acquisition: LogEntry[];
   storage: LogEntry[];
 }
+
+export interface InfluxCheckDetail {
+  ok: boolean;
+  message: string;
+  http_status: number | null;
+  latency_ms: number | null;
+}
+
+export interface InfluxConnectionStatus {
+  status: "ok" | "warning" | "error";
+  message: string;
+  checked_at: string;
+  health: InfluxCheckDetail;
+  write: InfluxCheckDetail;
+}

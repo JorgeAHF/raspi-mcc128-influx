@@ -67,6 +67,13 @@ export default function App() {
     refetchInterval: 15000,
   });
 
+  const influxStatusQuery = useQuery({
+    queryKey: ["influx-status"],
+    queryFn: () => api!.getInfluxStatus(),
+    enabled: Boolean(api),
+    refetchInterval: 30000,
+  });
+
   useEffect(() => {
     if (stationQuery.data) {
       setStationDraft(clone(stationQuery.data));
@@ -103,6 +110,14 @@ export default function App() {
       setErrorMessage("No se pudo obtener la hora del sistema.");
     }
   }, [timeQuery.error]);
+
+  useEffect(() => {
+    if (influxStatusQuery.error instanceof ApiError) {
+      setErrorMessage(influxStatusQuery.error.message);
+    } else if (influxStatusQuery.error) {
+      setErrorMessage("No se pudo verificar la conexión con InfluxDB.");
+    }
+  }, [influxStatusQuery.error]);
 
   const handleStationChange = (next: StationConfig) => {
     setStationDraft(next);
@@ -219,6 +234,13 @@ export default function App() {
           dirty={storageDirty}
           saving={storageSaving}
           loading={storageQuery.isLoading || !api}
+          influxStatus={influxStatusQuery.data ?? null}
+          checkingInflux={influxStatusQuery.isLoading || influxStatusQuery.isFetching}
+          onCheckInflux={() => {
+            influxStatusQuery.refetch().catch(() => {
+              /* handled via react-query */
+            });
+          }}
         />
 
         <SystemTimePanel
