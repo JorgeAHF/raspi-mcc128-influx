@@ -111,6 +111,31 @@ test.describe("Edge WebUI", () => {
       await route.fulfill(jsonResponse(sessionStatus));
     });
 
+    const logsPayload = {
+      acquisition: [
+        {
+          timestamp: new Date().toISOString(),
+          level: "WARNING",
+          logger: "edge.scr.acquisition",
+          message: "Timeout leyendo bloque",
+          category: "acquisition" as const,
+        },
+      ],
+      storage: [
+        {
+          timestamp: new Date().toISOString(),
+          level: "ERROR",
+          logger: "sender",
+          message: "Influx rechazó la escritura",
+          category: "storage" as const,
+        },
+      ],
+    };
+
+    await page.route("**/logs*", async (route) => {
+      await route.fulfill(jsonResponse(logsPayload));
+    });
+
     const previewPayload = {
       station_id: "station-1",
       captured_at_ns: 1_000_000_500,

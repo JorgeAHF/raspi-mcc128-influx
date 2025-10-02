@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 pytest.importorskip("fastapi")
+pytest.importorskip("httpx")
 from fastapi.testclient import TestClient
 
 from edge.config import store as config_store
@@ -23,6 +24,9 @@ from edge.webapi.acquisition import AcquisitionSessionManager
 def clear_auth_env(monkeypatch):
     monkeypatch.delenv("EDGE_WEBAPI_TOKEN", raising=False)
     monkeypatch.delenv("EDGE_WEBAPI_TOKEN_FILE", raising=False)
+    monkeypatch.delenv("EDGE_LOG_ACQUISITION_PATH", raising=False)
+    monkeypatch.delenv("EDGE_LOG_STORAGE_PATH", raising=False)
+    monkeypatch.delenv("EDGE_LOG_SENDER_PATH", raising=False)
 
 
 @pytest.fixture
@@ -208,4 +212,32 @@ def test_acquisition_timed_without_preview(api_client, stubbed_session_manager):
 
     stop = api_client.post("/acquisition/stop")
     assert stop.status_code == 200
+
+
+def test_logs_endpoint_filters_categories(api_client, tmp_path, monkeypatch):
+    log_path = tmp_path / "acquisition.log"
+    log_path.write_text(
+        "\n".join(
+            [
+                "2024-05-10 12:00:00,000 WARNING edge.scr.acquisition: Timeout leyendo bloque",
+                "2024-05-10 12:01:00,500 ERROR sender: Influx write failed",
+                "2024-05-10 12:02:00,750 INFO edge.scr.acquisition: Loop heartbeat",
+                "2024-05-10 12:03:00,900 CRITICAL edge.scr.acquisition: Sesión abortada",
+            ]
+        )
+    )
+
+    monkeypatch.setenv("EDGE_LOG_ACQUISITION_PATH", str(log_path))
+    monkeypatch.setenv("EDGE_LOG_STORAGE_PATH", str(log_path))
+
+    response = api_client.get("/logs?limit=5")
+    assert response.status_code == 200
+    payload = response.json()
+
+    acquisition_messages = [entry["message"] for entry in payload["acquisition"]]
+    storage_messages = [entry["message"] for entry in payload["storage"]]
+
+    assert "Timeout leyendo bloque" in acquisition_messages
+    assert "Sesión abortada" in acquisition_messages
+    assert storage_messages == ["Influx write failed"]
 

@@ -6,6 +6,7 @@ import { TokenManager } from "./components/TokenManager";
 import { PreviewDashboard } from "./pages/PreviewDashboard";
 import { SystemTimePanel } from "./pages/SystemTimePanel";
 import { ServiceStatusPanel } from "./pages/ServiceStatusPanel";
+import { LogsPanel } from "./pages/LogsPanel";
 import { StationConfigView } from "./pages/StationConfigView";
 import { StorageSettingsView } from "./pages/StorageSettingsView";
 import { StationConfig, StorageSettings } from "./types";
@@ -244,6 +245,8 @@ export default function App() {
           onSessionChanged={handleSessionRefresh}
           onError={(message) => setErrorMessage(message)}
         />
+
+        <LogsPanel api={api} onError={(message) => setErrorMessage(message)} />
       </main>
     </div>
   );

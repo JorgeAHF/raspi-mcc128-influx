@@ -141,3 +141,18 @@ export interface PreviewStreamOptions {
   max_duration_s?: number;
   downsample?: number;
 }
+
+export type LogCategory = "acquisition" | "storage";
+
+export interface LogEntry {
+  timestamp: string;
+  level: string;
+  logger: string;
+  message: string;
+  category: LogCategory;
+}
+
+export interface LogsResponse {
+  acquisition: LogEntry[];
+  storage: LogEntry[];
+}
