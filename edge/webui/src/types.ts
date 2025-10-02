@@ -105,6 +105,23 @@ export interface StopResponse {
   session: SessionSummary;
 }
 
+export interface TimeStatus {
+  system_time: string;
+  timezone: string | null;
+  ntp_enabled: boolean | null;
+  ntp_synchronized: boolean | null;
+  last_successful_sync: string | null;
+  last_attempt_sync: string | null;
+  server_name: string | null;
+  server_address: string | null;
+}
+
+export interface SyncTimeResponse {
+  message: string;
+  warnings: string[];
+  time: TimeStatus;
+}
+
 export interface PreviewChannelPayload {
   index: number;
   name: string;

@@ -4,6 +4,7 @@ import { ApiClient, ApiError, createApiClient } from "./api";
 import { ErrorBanner } from "./components/ErrorBanner";
 import { TokenManager } from "./components/TokenManager";
 import { PreviewDashboard } from "./pages/PreviewDashboard";
+import { SystemTimePanel } from "./pages/SystemTimePanel";
 import { ServiceStatusPanel } from "./pages/ServiceStatusPanel";
 import { StationConfigView } from "./pages/StationConfigView";
 import { StorageSettingsView } from "./pages/StorageSettingsView";
@@ -58,6 +59,13 @@ export default function App() {
     refetchInterval: 10000,
   });
 
+  const timeQuery = useQuery({
+    queryKey: ["system-time"],
+    queryFn: () => api!.getTimeStatus(),
+    enabled: Boolean(api),
+    refetchInterval: 15000,
+  });
+
   useEffect(() => {
     if (stationQuery.data) {
       setStationDraft(clone(stationQuery.data));
@@ -86,6 +94,14 @@ export default function App() {
       setErrorMessage("Error comunicando con la API.");
     }
   }, [stationQuery.error, storageQuery.error]);
+
+  useEffect(() => {
+    if (timeQuery.error instanceof ApiError) {
+      setErrorMessage(timeQuery.error.message);
+    } else if (timeQuery.error) {
+      setErrorMessage("No se pudo obtener la hora del sistema.");
+    }
+  }, [timeQuery.error]);
 
   const handleStationChange = (next: StationConfig) => {
     setStationDraft(next);
@@ -157,6 +173,18 @@ export default function App() {
     });
   };
 
+  const handleTimeRefresh = async () => {
+    try {
+      await timeQuery.refetch();
+    } catch (error) {
+      console.error("No se pudo actualizar el estado horario", error);
+    }
+  };
+
+  const handleTimeSynced = async () => {
+    await queryClient.invalidateQueries({ queryKey: ["system-time"] });
+  };
+
   const previewReady = Boolean(sessionQuery.data?.active && sessionQuery.data.session?.preview);
 
   return (
@@ -190,6 +218,15 @@ export default function App() {
           dirty={storageDirty}
           saving={storageSaving}
           loading={storageQuery.isLoading || !api}
+        />
+
+        <SystemTimePanel
+          api={api}
+          status={timeQuery.data ?? null}
+          loading={timeQuery.isLoading || timeQuery.isFetching || !api}
+          onRefresh={handleTimeRefresh}
+          onSynced={handleTimeSynced}
+          onError={(message) => setErrorMessage(message)}
         />
 
         <PreviewDashboard
