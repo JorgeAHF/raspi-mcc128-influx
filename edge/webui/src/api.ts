@@ -4,6 +4,7 @@ import {
   SessionStatusResponse,
   StartSessionRequest,
   StationConfig,
+  LogsResponse,
   StorageSettings,
   StopResponse,
   SyncTimeResponse,
@@ -130,6 +131,16 @@ export class ApiClient {
 
   async getTimeStatus(): Promise<TimeStatus> {
     return this.request<TimeStatus>("/system/time");
+  }
+
+  async getLogs(limit = 50): Promise<LogsResponse> {
+    const params = new URLSearchParams();
+    if (limit) {
+      params.set("limit", String(limit));
+    }
+    const query = params.toString();
+    const path = `/logs${query ? `?${query}` : ""}`;
+    return this.request<LogsResponse>(path);
   }
 
   async startAcquisition(payload: StartSessionRequest): Promise<SessionStatusResponse["session"]> {
